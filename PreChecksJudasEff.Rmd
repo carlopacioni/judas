@@ -1,0 +1,170 @@
+---
+title: "PreCheck Donkey data - Judas efficiency"
+author: "Carlo Pacioni"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load libraries
+```{r}
+# Load libraries
+options(java.parameters = "-Xmx8024m")
+library(XLConnect, quietly = T)
+library(ggplot2, quietly = T)
+library(data.table, quietly = T)
+```
+Read data
+```{r}
+data.path <- "../Data/"
+judas.master <- data.table(readWorksheetFromFile(
+  file = file.path(data.path, "Tracking_History_Judas_with habitat_MZ.xlsx"), 
+                      sheet="Judas_Tracking_History"))
+names(judas.master)
+```
+
+Check formatting
+```{r}
+sapply(judas.master, class)
+```
+
+LONG is character while it should be numeric. Checked what values are not numeric.
+
+```{r}
+judas.master[is.na(sapply(judas.master[, LONG], as.numeric)), ]
+
+```
+
+```{r}
+# Number dead
+judas.master[, sum(ACTION == "DEAD")]
+
+# Number collared
+judas.master[, sum(ACTION == "COLLARED")]
+
+# Number of judas in DB
+judas.master[, length(unique(JUDAS_ID))]
+
+# Rm useless spaces in REGION
+judas.master[, REGION := sub(pattern = " +", replacement = "", x = REGION)]
+# Number by region/shire
+judas.master[, .(njudas=length(unique(JUDAS_ID)), 
+                 start.date=min(EVENT_DATE), end.date=max(EVENT_DATE)), by=REGION]
+
+judas.master[, .(njudas=length(unique(JUDAS_ID)), 
+                 start.date=min(EVENT_DATE), end.date=max(EVENT_DATE)), 
+                 by=c("REGION", "SHIRE")]
+```
+Check whether there are animals that moved between shires during the study (it seems none)
+```{r}
+# build a function where IDbyLoc is a data.table with one col reporting locations
+   # (in this case shire), and the second, named 'IDs', is the judas' ids for each location
+   # location is a character vector of with the heading of the column reporting the location
+   # (here: location<- "SHIRE")
+check.migration <- function(IDbyLoc, location) {
+  areas <- unique(IDbyLoc[[location]])
+  nareas <- length(areas)
+  un.IDs <- IDbyLoc[, unique(IDs)]
+  setkeyv(IDbyLoc, location)
+  l2 <- vector(mode = "list", length = nareas)
+  for (a in areas) {
+    l2[[a]] <- vector(length = length(un.IDs))
+    names(l2[[a]]) <- un.IDs
+    for (u in un.IDs) {
+      l2[[a]][u] <- sum(IDbyLoc[a, IDs] %in% un.IDs[u]) > 0
+    }
+  }
+  names(l2) <- areas
+  d <- do.call(cbind, args = l2)
+  keep.row <- apply(d, MARGIN = 1, sum)
+  d <- cbind(un.IDs, data.table(d))
+  keep.row <- keep.row > 1
+  return(d[keep.row,])
+}
+
+# Create IDbyLoc
+IDbyShire <- judas.master[, .(IDs=unique(JUDAS_ID)), by=SHIRE]
+check.migration(IDbyShire, location = "SHIRE")
+
+```
+
+Clean up and generating variables
+```{r}
+# Rm found dead because they are out of the program
+judas.cleaned <- judas.master[ACTION != "DEAD", ]
+
+# Rm not found because they do not contribute 
+judas.cleaned <- judas.cleaned[ACTION != "NONE", ]
+
+# Cross check totals are still the same
+judas.cleaned[, .(njudas=length(unique(JUDAS_ID)), 
+                 start.date=min(EVENT_DATE), end.date=max(EVENT_DATE)), 
+              by=c("REGION", "SHIRE")]
+
+# Rm judas with no long
+keep <- !is.na(sapply(judas.cleaned[, LONG], as.numeric))
+judas.cleaned <- judas.cleaned[keep, ]
+judas.cleaned[is.na(sapply(judas.cleaned[, LONG], as.numeric)), ]
+judas.cleaned[, LONG := as.numeric(LONG)]
+
+# Set start and date
+judas.cleaned[, start.date := min(EVENT_DATE), by=JUDAS_ID]
+judas.cleaned[, end.date := max(EVENT_DATE), by=JUDAS_ID]
+
+# Cross check start.date matches collared
+judas.cleaned[ACTION == "COLLARED", date.coll := EVENT_DATE, by=JUDAS_ID]
+judas.cleaned[ACTION == "COLLARED", sum(start.date != date.coll, na.rm = T)]
+judas.cleaned[start.date != date.coll, ]
+
+# Rm date.coll
+judas.cleaned[, date.coll := NULL]
+
+# Length in the program
+judas.cleaned[, Time.deployment := difftime(end.date, start.date, units="weeks")]
+judas.cleaned[, Time.dep.years := round(as.numeric(Time.deployment) / 52, 2)]
+
+ggplot(judas.cleaned, aes(Time.dep.years)) + geom_histogram()
+summary(judas.cleaned[, Time.dep.years])
+
+```
+
+Some animals have end.date set on the day they have been collared (listed below). I'm assumed that these were animals that were collared on start.date and searched and not found, is this correct?
+Some other aniamls were tracked for several years, it is correct?
+
+```{r}
+# List of animals that have been deployed for 0 
+judas.cleaned[Time.deployment == 0, .SD, 
+              .SDcols=c("SHIRE", "JUDAS_ID", "EVENT_DATE", "EVENT_ID", "EVENT",
+                        "ACTION")]
+
+judas.cleaned <- judas.cleaned[Time.deployment>0,]
+
+# List of animals that have been deployed for > 10 yrs 
+judas.cleaned[Time.dep.years > 10,  unique(JUDAS_ID)]
+```
+
+Check whether there are judas with < 5 data points and rm
+```{r}
+locs <- judas.cleaned[, .N, by=JUDAS_ID]
+locs[, sum(N<6)]
+IDs.rm <- locs[N<6, JUDAS_ID]
+judas.cleaned <- judas.cleaned[!JUDAS_ID %in% IDs.rm, ]
+```
+
+
+Save final dataset and csv with sample size
+```{r}
+dir.create(file.path(data.path, "Analysis"))
+save(judas.cleaned, file = file.path(data.path, "judas.cleaned.rda"))
+descr.fin <- judas.cleaned[, .(njudas=length(unique(JUDAS_ID)), 
+                 start.date=min(EVENT_DATE), end.date=max(EVENT_DATE)), 
+                 by=c("REGION", "SHIRE")]
+descr.fin
+descr.fin[, sum(njudas)]
+write.csv(descr.fin, file = file.path(data.path, "Analysis", "descr.fin.csv"), 
+          row.names = F)
+
+ntrack.events <- judas.cleaned[, .N, by=JUDAS_ID]
+ntrack.events[, summary(N)]
+```
