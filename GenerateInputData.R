@@ -2,6 +2,7 @@ library(ggplot2, quietly = T)
 library(data.table, quietly = T)
 library(RcppAlgos)
 
+#### Helper functions ####
 calc.latlong.dist<- function(xy1,xy2)
 {
   # uses spherical law of cosines to calculate distance between two lat/long
@@ -12,8 +13,9 @@ calc.latlong.dist<- function(xy1,xy2)
   D <- acos(sin(xy1[,1])*sin(xy2[,1]) + cos(xy1[,1])*cos(xy2[,1])*cos(xy2[,2]-xy1[,2]))  
   return(R*D)
 }
-#--------------------------------------------------
+#------------------------------------------------------------------------------#
 
+# Start from the clean dataset generated with PreChecksJudasEff.Rmd
 data.path <- "../Data/"
 load(file = file.path(data.path, "judas.cleaned.rda"))
 
@@ -106,6 +108,93 @@ for(rn in seq_len(rns)) {
 }
 )
 
+# Calculate deviations from HRcentres #
+judas.cleaned[, xdev:=calc.latlong.dist(judas.cleaned[, .(LAT, HRlong)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, LONG)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+
 write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
 save(judas.Dist, file = file.path(data.path, "judas.Dist.RDA"))
+save(judas.cleaned, file = file.path(data.path, "judas.cleaned.rda"))
 
+#### Balance id1 and id1 to similar counts ####
+# If resumed
+#------------------------------------------------------------------------------#
+data.path <- "../Data/"
+load(file = file.path(data.path, "judas.cleaned.rda"))
+load(file = file.path(data.path, "judas.Dist.rda"))
+#------------------------------------------------------------------------------#
+judas.Dist.Bal <- judas.Dist
+judas.Dist.Bal[, Rn:=seq_len(nrow(judas.Dist))]
+
+JUDAS_ID <- unique(c(judas.Dist[, ID.1], judas.Dist[, ID.2]))
+ID.1cnt.table <- judas.Dist.Bal[, .(ID.1cnt=.N), by=ID.1]
+ID.2cnt.table <- judas.Dist.Bal[, .(ID.2cnt=.N), by=ID.2]
+setnames(ID.1cnt.table, "ID.1", "JUDAS_ID")
+setnames(ID.2cnt.table, "ID.2", "JUDAS_ID")
+
+counts <- data.table(JUDAS_ID)
+counts <- merge(counts, ID.1cnt.table, on=JUDAS_ID, all.x=TRUE)
+counts <- merge(counts, ID.2cnt.table, on=JUDAS_ID, all.x=TRUE)
+counts[is.na(ID.1cnt), ID.1cnt:=0]
+counts[is.na(ID.2cnt), ID.2cnt:=0]
+counts[, Tot:=ID.1cnt + ID.2cnt]
+counts[, prop:=ID.1cnt/Tot]
+counts[, summary(prop)]
+
+nrefinement <- 5
+rf <- 1
+while(rf < nrefinement | 
+      (counts[, quantile(prop, probs = 0.025)] < 0.4 & 
+       counts[, quantile(prop, probs = 0.975)] > 0.6)) {
+  for(rn in nrow(counts):1) {
+    if(counts[rn, ID.1cnt] - counts[rn, ID.2cnt] < -3) {
+      num <- floor(counts[rn, Tot]/2) - counts[rn, ID.1cnt]
+      inds <- judas.Dist.Bal[ID.2 %in% counts[rn, JUDAS_ID], Rn]
+      ID.1s <- judas.Dist.Bal[inds, ID.1]
+      keep <- ID.1s %in% counts[prop > 0.5, JUDAS_ID]
+      if(sum(keep) == 0) next
+      sinds <- inds[keep]
+      if(length(sinds) > num) sinds <- sample(inds,size=num,replace=F)
+      move2ID.2 <- judas.Dist.Bal[sinds, ID.1]
+      move2ID.1 <- judas.Dist.Bal[sinds, ID.2]
+      judas.Dist.Bal[sinds, ID.1:=move2ID.1]
+      judas.Dist.Bal[sinds, ID.2:=move2ID.2]
+    }
+  }
+  
+  for(rn in 1:nrow(counts)) {
+    if(counts[rn, ID.1cnt] - counts[rn, ID.2cnt] > 3) {
+      num <- floor(counts[rn, Tot]/2) - counts[rn, ID.2cnt]
+      inds <- judas.Dist.Bal[ID.1 %in% counts[rn, JUDAS_ID], Rn]
+      ID.2s <- judas.Dist.Bal[inds, ID.2]
+      keep <- ID.2s %in% counts[prop < 0.5, JUDAS_ID]
+      if(sum(keep) == 0) next
+      sinds <- inds[keep]
+      if(length(sinds) > num) sinds <- sample(inds,size=num,replace=F)
+      move2ID.2 <- judas.Dist.Bal[sinds, ID.1]
+      move2ID.1 <- judas.Dist.Bal[sinds, ID.2]
+      judas.Dist.Bal[sinds, ID.1:=move2ID.1]
+      judas.Dist.Bal[sinds, ID.2:=move2ID.2]
+    }
+  }
+  ID.1cnt.table <- judas.Dist.Bal[, .(ID.1cnt=.N), by=ID.1]
+  ID.2cnt.table <- judas.Dist.Bal[, .(ID.2cnt=.N), by=ID.2]
+  setnames(ID.1cnt.table, "ID.1", "JUDAS_ID")
+  setnames(ID.2cnt.table, "ID.2", "JUDAS_ID")
+  
+  counts <- data.table(JUDAS_ID)
+  counts <- merge(counts, ID.1cnt.table, on=JUDAS_ID, all.x=TRUE)
+  counts <- merge(counts, ID.2cnt.table, on=JUDAS_ID, all.x=TRUE)
+  counts[is.na(ID.1cnt), ID.1cnt:=0]
+  counts[is.na(ID.2cnt), ID.2cnt:=0]
+  counts[, Tot:=ID.1cnt + ID.2cnt]
+  counts[, prop:=ID.1cnt/Tot]
+  rf <- rf + 1
+}
+
+rf
+counts[, quantile(prop, probs = 0.025)] 
+counts[, quantile(prop, probs = 0.975)]
+counts[, summary(prop)]
