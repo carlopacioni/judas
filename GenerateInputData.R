@@ -1,6 +1,5 @@
 library(ggplot2, quietly = T)
 library(data.table, quietly = T)
-library(geosphere)
 library(RcppAlgos)
 
 calc.latlong.dist<- function(xy1,xy2)
