@@ -108,5 +108,5 @@ for(rn in seq_len(rns)) {
 )
 
 write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
-
+save(judas.Dist, file = file.path(data.path, "judas.Dist.RDA"))
 
