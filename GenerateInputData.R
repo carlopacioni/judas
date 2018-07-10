@@ -115,7 +115,7 @@ judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, LONG)],
                                         judas.cleaned[, .(HRlat, HRlong)])]
 
 write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
-save(judas.Dist, file = file.path(data.path, "judas.Dist.RDA"))
+save(judas.Dist, file = file.path(data.path, "judas.Dist.rda"))
 save(judas.cleaned, file = file.path(data.path, "judas.cleaned.rda"))
 
 #### Balance id1 and id1 to similar counts ####
@@ -198,3 +198,5 @@ rf
 counts[, quantile(prop, probs = 0.025)] 
 counts[, quantile(prop, probs = 0.975)]
 counts[, summary(prop)]
+
+save(judas.Dist.Bal, file = file.path(data.path, "judas.Dist.Bal.rda"))
