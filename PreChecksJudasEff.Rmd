@@ -56,18 +56,19 @@ judas.master[, .(njudas=length(unique(JUDAS_ID)),
                  start.date=min(EVENT_DATE), end.date=max(EVENT_DATE)), 
                  by=c("REGION", "SHIRE")]
 ```
-Check whether there are animals that moved between shires during the study (it seems none)
+Check whether there are animals that moved between regions, shires or property during the study (it seems none, is this correct?)
 ```{r}
 # build a function where IDbyLoc is a data.table with one col reporting locations
-   # (in this case shire), and the second, named 'IDs', is the judas' ids for each location
-   # location is a character vector of with the heading of the column reporting the location
-   # (here: location<- "SHIRE")
+   # (e.g. shire), and the second, named 'IDs', is the judas' ids within each location
 check.migration <- function(IDbyLoc, location) {
   areas <- unique(IDbyLoc[[location]])
   nareas <- length(areas)
+  # Unique IDs
   un.IDs <- IDbyLoc[, unique(IDs)]
+  names(un.IDs) <- IDbyLoc[, unique(IDs)]
   setkeyv(IDbyLoc, location)
   l2 <- vector(mode = "list", length = nareas)
+  # For each area checks what ID are present
   for (a in areas) {
     l2[[a]] <- vector(length = length(un.IDs))
     names(l2[[a]]) <- un.IDs
@@ -75,8 +76,9 @@ check.migration <- function(IDbyLoc, location) {
       l2[[a]][u] <- sum(IDbyLoc[a, IDs] %in% un.IDs[u]) > 0
     }
   }
-  names(l2) <- areas
+  # Combined in a data.frame where locations are columns
   d <- do.call(cbind, args = l2)
+  # sum row-wise, if the same ID is present in more than one location the sum>1
   keep.row <- apply(d, MARGIN = 1, sum)
   d <- cbind(un.IDs, data.table(d))
   keep.row <- keep.row > 1
@@ -86,6 +88,12 @@ check.migration <- function(IDbyLoc, location) {
 # Create IDbyLoc
 IDbyShire <- judas.master[, .(IDs=unique(JUDAS_ID)), by=SHIRE]
 check.migration(IDbyShire, location = "SHIRE")
+
+IDbyRegion <- judas.master[, .(IDs=unique(JUDAS_ID)), by=REGION]
+check.migration(IDbyRegion, location = "REGION")
+
+IDbyArea <- judas.master[, .(IDs=unique(JUDAS_ID)), by=AREA]
+check.migration(IDbyArea, location = "AREA")
 
 ```
 
@@ -108,18 +116,26 @@ judas.cleaned <- judas.cleaned[keep, ]
 judas.cleaned[is.na(sapply(judas.cleaned[, LONG], as.numeric)), ]
 judas.cleaned[, LONG := as.numeric(LONG)]
 
-# Set start and date
+# Set start and end date
 judas.cleaned[, start.date := min(EVENT_DATE), by=JUDAS_ID]
 judas.cleaned[, end.date := max(EVENT_DATE), by=JUDAS_ID]
 
 # Cross check start.date matches collared
 judas.cleaned[ACTION == "COLLARED", date.coll := EVENT_DATE, by=JUDAS_ID]
 judas.cleaned[ACTION == "COLLARED", sum(start.date != date.coll, na.rm = T)]
+
+```
+
+Some animals have been collared after their start date. Is this a collar replacement?
+```{r}
 judas.cleaned[start.date != date.coll, ]
 
 # Rm date.coll
 judas.cleaned[, date.coll := NULL]
+```
 
+Let's have a look at the length in the program for each donkey"
+```{r}
 # Length in the program
 judas.cleaned[, Time.deployment := difftime(end.date, start.date, units="weeks")]
 judas.cleaned[, Time.dep.years := round(as.numeric(Time.deployment) / 52, 2)]
@@ -151,6 +167,81 @@ locs[, sum(N<6)]
 IDs.rm <- locs[N<6, JUDAS_ID]
 judas.cleaned <- judas.cleaned[!JUDAS_ID %in% IDs.rm, ]
 ```
+
+Calculates the home range centre as arithmetic mean of coordinate and compute deviation from the centre on the X and Y
+```{r}
+# Home Range centres
+judas.cleaned[, ':='(HRlat=mean(LAT), HRlong=mean(LONG)), by=JUDAS_ID]
+
+calc.latlong.dist<- function(xy1,xy2)
+{
+  # uses spherical law of cosines to calculate distance between two lat/long
+  # coordinates in decimal degrees
+  R <- 6371 # Earths radius
+  xy1 <- (pi * xy1)/180 # radians
+  xy2 <- (pi * xy2)/180 
+  D <- acos(sin(xy1[,1])*sin(xy2[,1]) + cos(xy1[,1])*cos(xy2[,1])*cos(xy2[,2]-xy1[,2]))  
+  return(R*D)
+}
+
+# Calculate deviations from HRcentres 
+judas.cleaned[, xdev:=calc.latlong.dist(judas.cleaned[, .(LAT, HRlong)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, LONG)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, summary(xdev)]
+judas.cleaned[, summary(ydev)]
+
+```
+
+Something is clearly wrong as some animals have moved ~ 2,000 km north or south and >12,000 km east or west.
+Let's check what happened:
+```{r}
+judas.cleaned[ydev>12000,]
+```
+
+Okay some animals have coordinates 0 (somewhere in central Africa!). I guess that these were meant to be NA, removed for now and check again.
+```{r}
+judas.cleaned <- judas.cleaned[LAT < 0,]
+judas.cleaned[, ':='(HRlat=mean(LAT), HRlong=mean(LONG)), by=JUDAS_ID]
+judas.cleaned[, xdev:=calc.latlong.dist(judas.cleaned[, .(LAT, HRlong)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, LONG)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, summary(xdev)]
+judas.cleaned[, summary(ydev)]
+
+```
+
+This is better, but still the distibution is very odd... 75% moved less than 6 km but max value is 300 or 500 km?
+```{r}
+judas.cleaned[xdev > 200,]
+judas.cleaned[, summary(LAT)]
+```
+
+Some donkey have LAT<-14 and are in the middle of the Timor sea! Other have done a sudden move of >200 km... is that possible?
+
+For now I keep only entries where xdev and ydev is less than ~20 km
+```{r}
+judas.cleaned <- judas.cleaned[xdev < 20,]
+judas.cleaned[, ':='(HRlat=mean(LAT), HRlong=mean(LONG)), by=JUDAS_ID]
+judas.cleaned[, xdev:=calc.latlong.dist(judas.cleaned[, .(LAT, HRlong)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, LONG)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, summary(xdev)]
+judas.cleaned[, summary(ydev)]
+
+judas.cleaned <- judas.cleaned[ydev < 20,]
+judas.cleaned[, ':='(HRlat=mean(LAT), HRlong=mean(LONG)), by=JUDAS_ID]
+judas.cleaned[, xdev:=calc.latlong.dist(judas.cleaned[, .(LAT, HRlong)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, LONG)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, summary(xdev)]
+judas.cleaned[, summary(ydev)]
+```
+
 
 
 Save final dataset and csv with sample size
