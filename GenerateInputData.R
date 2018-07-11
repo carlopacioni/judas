@@ -85,6 +85,8 @@ judas.cleaned[, EVENT_DATE := as.Date(EVENT_DATE)]
 
 rns <- nrow(judas.Dist) # Number of judas pairs
 # There must be a clever way to do this, but couldn't think any...
+# This takes about 40 mins, an lapply and parallel execution would be faster, 
+# but I didn't bother. Worth considering for larger datasets though.
 system.time(
 for(rn in seq_len(rns)) {
   data.ID1 <- judas.cleaned[judas.Dist[rn, ID.1], ]
@@ -199,4 +201,5 @@ counts[, quantile(prop, probs = 0.025)]
 counts[, quantile(prop, probs = 0.975)]
 counts[, summary(prop)]
 
+# Note that data regarding ID.1 and ID.2 may be swapped now
 save(judas.Dist.Bal, file = file.path(data.path, "judas.Dist.Bal.rda"))
