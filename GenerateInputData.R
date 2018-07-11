@@ -120,7 +120,7 @@ write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names =
 save(judas.Dist, file = file.path(data.path, "judas.Dist.rda"))
 save(judas.cleaned, file = file.path(data.path, "judas.cleaned.rda"))
 
-#### Balance id1 and id1 to similar counts ####
+#### Balance id1 and id2 to similar counts ####
 # If resumed
 #------------------------------------------------------------------------------#
 data.path <- "../Data/"
