@@ -1,0 +1,46 @@
+data {
+# y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
+# N1 is the number of observations (pairs); M is the number of individuals
+# time is in (integer) months
+    for (i in 1:N1) {
+    y[i,time[i]] <- d[i]   
+    for (j in 1:(time[i]-1)) {
+    y[i,j] <- 0
+      }
+    }
+  }
+    
+model  {
+    
+    for (i in 1:N1) {
+    for (j in 1:time[i])   {
+    y[i,j] ~ dbern(q[i,j])
+    cloglog(q[i,j]) <-b1[id1[i]] + b2[id1[i]]*distance[i] 
+      }
+     }
+    
+    #mudist<- mean(distance[])
+    #sddist<- sd(distance[])
+    
+    for(k in 1:M) {
+    b1[k]<- B[k,1]
+    b2[k]<- B[k,2]
+    B[k,1:2] ~ dmnorm(B.hat[k,],Tau.B[,])
+    B.hat[k,1]<- mu.b1
+    B.hat[k,2]<- mu.b2
+      }
+    
+    mu.b1 ~ dnorm(0, 0.1)
+    mu.b2 ~ dnorm(0, 0.1)
+    
+    
+    Tau.B[1:2,1:2]<- inverse(Sigma.B[,])
+    Sigma.B[1,1]<- pow(sigma.b1, 2)
+    Sigma.B[2,2]<- pow(sigma.b2, 2)
+    Sigma.B[1,2]<- rho.b*sigma.b1*sigma.b2
+    Sigma.B[2,1]<- Sigma.B[1,2]
+    sigma.b1 ~ dunif(0,20)
+    sigma.b2 ~ dunif(0,20)
+    rho.b ~ dunif(-1,1)
+    
+  }
