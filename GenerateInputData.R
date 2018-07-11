@@ -19,9 +19,6 @@ calc.latlong.dist<- function(xy1,xy2)
 data.path <- "../Data/"
 load(file = file.path(data.path, "judas.cleaned.rda"))
 
-# Home Range centres
-judas.cleaned[, ':='(HRlat=mean(LAT), HRlong=mean(LONG)), by=JUDAS_ID]
-
 names(judas.cleaned)
 setkey(judas.cleaned, JUDAS_ID)
 
@@ -66,6 +63,10 @@ judas.Dist[, Concurrent :=
 setkey(judas.Dist, Concurrent)
 judas.Dist <- judas.Dist["yes", ] # get rid of judas that were not present at same time
 
+# Keep only pairs from the same region
+judas.Dist[, RegCheck:=REGION.1 == REGION.2]
+judas.Dist <- judas.Dist[(RegCheck),]
+
 # Prepare columns
 # event is 0 when there is no encounter, and 1 when there is
 # time is the length of time when both were 'deployed' (the beginning of the 
@@ -82,8 +83,11 @@ judas.Dist[, (jd.dates) := lapply(.SD, as.Date), .SDcols=jd.dates]
 
 judas.cleaned[, EVENT_DATE := as.Date(EVENT_DATE)] 
 
+# summary stats
+judas.Dist[, summary(Dist)]
 
 rns <- nrow(judas.Dist) # Number of judas pairs
+
 # There must be a clever way to do this, but couldn't think any...
 # This takes about 40 mins, an lapply and parallel execution would be faster, 
 # but I didn't bother. Worth considering for larger datasets though.
@@ -110,23 +114,22 @@ for(rn in seq_len(rns)) {
 }
 )
 
-# Calculate deviations from HRcentres #
-judas.cleaned[, xdev:=calc.latlong.dist(judas.cleaned[, .(LAT, HRlong)],
-                                        judas.cleaned[, .(HRlat, HRlong)])]
-judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, LONG)],
-                                        judas.cleaned[, .(HRlat, HRlong)])]
-
 write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
 save(judas.Dist, file = file.path(data.path, "judas.Dist.rda"))
-save(judas.cleaned, file = file.path(data.path, "judas.cleaned.rda"))
 
 #### Balance id1 and id2 to similar counts ####
 # If resumed
 #------------------------------------------------------------------------------#
 data.path <- "../Data/"
 load(file = file.path(data.path, "judas.cleaned.rda"))
+judas.cleaned[, EVENT_DATE := as.Date(EVENT_DATE)]
+
 load(file = file.path(data.path, "judas.Dist.rda"))
 #------------------------------------------------------------------------------#
+# Compute descriptive stats of distance when event=1
+judas.Dist[event == 1, summary(Dist)]
+ggplot(judas.Dist[event == 1, ], aes(Dist)) + geom_density() + xlim(c(0, 100))
+
 judas.Dist.Bal <- judas.Dist
 judas.Dist.Bal[, Rn:=seq_len(nrow(judas.Dist))]
 
