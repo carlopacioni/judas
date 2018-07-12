@@ -1,18 +1,18 @@
-options(java.parameters="-Xmx8024m")
-library(XLConnect)
+
+library(readxl)  # I think this is better than XLconnect and it doesn't require java !
 library(ggplot2)
 library(data.table)
 
 data.path <- "../Data"
 dir.create(file.path(data.path, "Analysis"))
 
-opp.shoot <- data.table(readWorksheetFromFile(
-  file=file.path(data.path, "Tracking_History_Opportunistic.xlsx"), 
+opp.shoot <- data.table(read_excel(
+  path=file.path(data.path, "Tracking_History_Opportunistic.xlsx"), 
   sheet="OPP_Tracking_Data"))
 nms.o <- names(opp.shoot)
 
-judas.master <- data.table(readWorksheetFromFile(
-  file=file.path(data.path, "Tracking_History_Judas_with habitat_MZ.xlsx"), 
+judas.master <- data.table(read_excel(
+  path=file.path(data.path, "Tracking_History_Judas_with habitat_MZ.xlsx"), 
   sheet="Judas_Tracking_History"))
 nms.jm <- names(judas.master)
 
