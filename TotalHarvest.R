@@ -58,12 +58,18 @@ judas.master[, TrackedShire:=
                       ifelse(TrackedShire == "BROOME" | TrackedShire == "DERB", "WK", 
                              ifelse(TrackedShire == "HALL", "HC", 
                                     ifelse(TrackedShire == "WYND", "EW", "other"))))]
+judas.master[LAT > -17 & LONG > 128.5, TrackedShire:="WK"]
+judas.master[LAT < -17 & LONG > 128.5, TrackedShire:="HC"]
+judas.master[LAT < -19.98 & LONG < 120.25, TrackedShire:="PB"]
 
 opp.shoot[, TrackedShire:=
                ifelse(TrackedShire == "PHED" | TrackedShire == "EPIL", "PB",
                       ifelse(TrackedShire == "BROOME" | TrackedShire == "DERB", "WK", 
                              ifelse(TrackedShire == "HALL", "HC", 
                                     ifelse(TrackedShire == "WYND", "EW", "other"))))]
+opp.shoot[Latitude > -17 & Longitude > 128.5, TrackedShire:="WK"]
+opp.shoot[Latitude < -17 & Longitude > 128.5, TrackedShire:="HC"]
+opp.shoot[Latitude < -19.98 & Longitude < 120.25, TrackedShire:="PB"]
 
 # Rm useless spaces in REGION
 judas.master[, REGION := sub(pattern=" +", replacement="", x=REGION)]
