@@ -1,4 +1,3 @@
-
 library(readxl)  # I think this is better than XLconnect and it doesn't require java !
 library(ggplot2)
 library(data.table)
