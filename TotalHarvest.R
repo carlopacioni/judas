@@ -2,6 +2,7 @@ library(readxl)  # I think this is better than XLconnect and it doesn't require 
 library(ggplot2)
 library(data.table)
 library(sf, quietly=T)
+library(dplyr)
 
 data.path <- "../Data"
 dir.create(file.path(data.path, "Analysis"))
@@ -23,9 +24,9 @@ kimb_LGA<- kimb_LGA %>% st_transform(4326) # convert to Lat/Long
 # Insert a col with location (shire) where the animals have been tracked, e.g. 'TrackedShire'
 # Judas.master
 judas.master<- judas.master %>% filter(!is.na(LONG))
-judas.master_sf<- st_as_sf(judas.master, coords = c("LONG", "LAT"), crs = 4326, agr = "identity")
+judas.master_sf<- st_as_sf(judas.master, coords=c("LONG", "LAT"), crs=4326, agr="identity")
 curr_LGA<- st_intersects(judas.master_sf, kimb_LGA, sparse=F)
-judas.master<- judas.master %>% mutate(TrackedShire = case_when(
+judas.master<- judas.master %>% mutate(TrackedShire=case_when(
   curr_LGA[,1] ~ "HALL",
   curr_LGA[,2] ~ "PHED",
   curr_LGA[,3] ~ "EPIL",
@@ -36,10 +37,10 @@ judas.master<- judas.master %>% mutate(TrackedShire = case_when(
 
 # opp.shoot
 #judas.master<- judas.master %>% filter(!is.na(LONG))
-opp.shoot_sf <- st_as_sf(opp.shoot, coords = c("Longitude", "Latitude"), 
-                           crs = 4326, agr = "identity")
+opp.shoot_sf <- st_as_sf(opp.shoot, coords=c("Longitude", "Latitude"), 
+                           crs=4326, agr="identity")
 curr_LGA <- st_intersects(opp.shoot_sf, kimb_LGA, sparse=F)
-opp.shoot <- opp.shoot %>% mutate(TrackedShire = case_when(
+opp.shoot <- opp.shoot %>% mutate(TrackedShire=case_when(
   curr_LGA[,1] ~ "HALL",
   curr_LGA[,2] ~ "PHED",
   curr_LGA[,3] ~ "EPIL",
@@ -80,33 +81,54 @@ judas.master[, Month:=month(EVENT_DATE)]
 
 #### Effort ####
 # Count instances
-runs <- judas.master[, .N, by=c("EVENT_DATE", "Year", "Month", "REGION", "TrackedShire")]
+runs <- judas.master[, .(.N, N_Ferals=sum(N_FERALS)), 
+                     by=c("EVENT_DATE", "Year", "Month", "REGION", "TrackedShire")]
+runs[, Effort_judas:=N_Ferals * ifelse(N_Ferals<10, 0.005, 0.016)]
 ncollared <- judas.master[ACTION == "COLLARED", .(Ncollared=.N),
                           by=c("EVENT_DATE", "Year", "Month", "REGION", "TrackedShire")]
+nshot <- judas.master[ACTION == "SHOT", .(Nshot=.N),
+                          by=c("EVENT_DATE", "Year", "Month", "REGION", "TrackedShire")]
+
+
 # Meerge together
 runs <- merge(runs, ncollared, all.x=T, 
               on=c("EVENT_DATE", "Year", "Month", "REGION", "TrackedShire"))
+runs <- merge(runs, nshot, all.x=T, 
+              on=c("EVENT_DATE", "Year", "Month", "REGION", "TrackedShire"))
 
-runs_month <- runs[, .(.N, Ncollared=sum(Ncollared, na.rm = T)), 
+runs_month <- runs[, .(.N, Ncollared=sum(Ncollared, na.rm=T),
+                       Nshot=sum(Nshot, na.rm=T),
+                       N_Ferals=sum(N_Ferals, na.rm=T), 
+                       Effort_judas=sum(Effort_judas)), 
                    by=c("Year", "Month", "REGION", "TrackedShire")]
 
-runs_month <- runs_month[, Effort := N * 7.5 - Ncollared * 0.5]
+runs_month <- runs_month[, ':='(
+  Effort_opp=N * 6.5 - Ncollared * 0.5 - Nshot * 0.08 - N_Ferals * 
+    ifelse(N_Ferals<10, 0.005, 0.016), 
+  Effort_judas=N_Ferals * 0.005)]
 surveyed_months <- runs_month[, .N, by=c("REGION", "TrackedShire", "Month")]
+
+runs_month[, summary(Effort_opp)]
+runs_month[, summary(Effort_judas)]
+runs_month[Effort_opp<0,]
+runs_year <- runs_month[, .(Effort_opp=sum(Effort_opp), 
+                            Effort_judas=sum(Effort_judas)), 
+                      by=c("Year", "REGION", "TrackedShire")]
 
 # Number of year of the program per region
 runs_month[, .(Min=min(Year), Max=max(Year), nYear=max(Year) - min(Year)), 
            by=REGION]
 
 ggplot(surveyed_months, aes(factor(Month), N)) + geom_histogram(stat="identity") + 
-  facet_grid(TrackedShire~REGION) + geom_hline(yintercept = 19, col="red") + 
-  geom_hline(yintercept = 23, col="blue")
+  facet_grid(TrackedShire~REGION) + geom_hline(yintercept=19, col="red") + 
+  geom_hline(yintercept=23, col="blue")
 
-ggplot(data = runs_month, aes(x=factor(Month), y=Year)) +
-  geom_raster(aes(fill = N), interpolate = F) +
-  scale_fill_gradient(low = "yellow", high = "red") + facet_grid(TrackedShire~REGION)
+ggplot(data=runs_month, aes(x=factor(Month), y=Year)) +
+  geom_raster(aes(fill=N), interpolate=F) +
+  scale_fill_gradient(low="yellow", high="red") + facet_grid(TrackedShire~REGION)
 
-write.csv(runs_month, file.path(data.path, "Effort.csv"), row.names = F)  
-write.csv(judas.master, file.path(data.path, "judas.master.Effort.csv"), row.names = F)  
+write.csv(runs_month, file.path(data.path, "Effort.csv"), row.names=F)  
+write.csv(judas.master, file.path(data.path, "judas.master.Effort.csv"), row.names=F)  
 
 #### Total Harvest ####
 
@@ -158,6 +180,71 @@ totals_Region[, Total := sum(N), by=Year]
 ggplot(totals_Region, aes(Year, N, colour=Region, shape=Method)) + geom_point() + 
   geom_line(aes(Year, Total), colour="black")
 
-ggsave(filename = file.path(data.path, "Analysis", "TotalHarvest.pdf"))
-write.csv(tot.harvest, file = file.path(data.path, "tot.harvest.csv"))
-write.csv(totals, file = file.path(data.path, "totals.csv"))
+ggsave(filename=file.path(data.path, "Analysis", "TotalHarvest.pdf"))
+write.csv(tot.harvest, file=file.path(data.path, "tot.harvest.csv"), row.names=F)
+write.csv(totals, file=file.path(data.path, "totals.csv"), row.names=F)
+
+#### Combine in the same table ###
+setnames(runs_year, "REGION", "Region")
+TotalHarvest_Effort <- merge(totals, runs_year, all.x=T, 
+                             on=c("Year", "Region", "TrackedShire"))
+write.csv(TotalHarvest_Effort, file=file.path(data.path, "totals_with_effort.csv"), 
+          row.names=F)
+
+TotalHarvest_Effort[, summary(Effort_opp)]
+TotalHarvest_Effort[, summary(log(Effort_opp))]
+TotalHarvest_Effort[, summary(log(Effort_judas+1))]
+
+
+p_EffOpp <- ggplot(TotalHarvest_Effort[Method == "Opportunistic" & TrackedShire != "other",], 
+       aes(Year, log(Effort_opp))) + geom_point(aes(size=N, col=N)) +
+  scale_colour_gradient(low="yellow", high="red") + facet_grid(TrackedShire~.)
+
+p_EffJudas <- ggplot(TotalHarvest_Effort[Method == "Judas" & TrackedShire != "other",], 
+                   aes(Year, log(Effort_judas + 1))) + geom_point(aes(size=N, col=N)) +
+  scale_colour_gradient(low="yellow", high="red") + facet_grid(TrackedShire~.)
+
+ggsave(filename = file.path(data.path, "Plot_Harvest_effort_Opportunistic.pdf"), plot = p_EffOpp)
+ggsave(filename = file.path(data.path, "Plot_Harvest_effort_judas.pdf"), plot = p_EffJudas)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
