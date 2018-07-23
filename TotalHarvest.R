@@ -95,199 +95,157 @@ judas.master[, Month:=month(Date)]
 opp.shoot[, Year:=year(Date)]
 opp.shoot[, Month:=month(Date)]
 
+write.csv(judas.master, file.path(data.path, "Judas.master.TrackedShire.csv"))
+
 #### Effort ####
 
-
-# Count instances
-runs <- judas.master[, .(N_JudasTracked=.N, N_Ferals=sum(N_Ferals)), 
-                     by=c("Date", "Year", "Month", "Region", "SurvShire")]
-# effort in secs over a hr (3600 secs) is per individual. Longer time is needed 
-        # for larger groups (except camels) because animals separate
-runs[, EffortShootingFeralsWithJudas:=N_Ferals * ifelse(N_Ferals<10, 10/3600, 60/3600)]
-ncollared <- judas.master[ACTION == "COLLARED", .(Ncollared=.N),
-                          by=c("Date", "Year", "Month", "Region", "SurvShire")]
-nshot <- judas.master[ACTION == "SHOT", .(N_JudasShot=.N),
-                          by=c("Date", "Year", "Month", "Region", "SurvShire")]
-
+# Effort in secs over a hr (3600 secs) is per individual. Longer time is needed 
+# for larger groups (except camels) because animals separate
+judas.master[, EffortShootingFeralsWithJudas:=N_Ferals * 
+       ifelse(N_Ferals < 10, 10/3600, 60/3600)]
 opp.shoot[, EffortShootingHorses:=N_Horses * 60/3600]
 opp.shoot[, EffortShootingCamel:=N_Camels * ifelse(N_Camels<15, 10/3600, 20/3600)]
-opp.shoot_month <- opp.shoot[, .(EffortShootingHorses=sum(EffortShootingHorses),
-                                 EffortShootingCamel=sum(EffortShootingCamel)), 
-                             by=c("Year", "Month", "Region", "SurvShire")]
-opp.shoot_month[, lapply(.SD, summary), .SDcols=c("EffortShootingHorses", "EffortShootingCamel")]
+opp.shoot[, EffortShootingFerals:=N_Ferals * ifelse(N_Ferals < 10, 10/3600, 60/3600)]
+opp.shoot.days <- opp.shoot[, .(N_Ferals=sum(N_Ferals), N_Horses=sum(N_Horses), 
+                                N_Camels=sum(N_Camels), 
+                                EffortShootingHorses=sum(EffortShootingHorses),
+                                EffortShootingCamel=sum(EffortShootingCamel),
+                                EffortShootingFerals=sum(EffortShootingFerals)),
+                            by=c("Date", "Year", "Month", "Region")]
 
-ggplot(opp.shoot_month) + geom_histogram(aes(EffortShootingHorses), col="blue") +
-  geom_histogram(aes(EffortShootingCamel), col="red")
+# Count instances
+#feralsWithJudas <- judas.master[SEARCHED == "YES", .(N_Ferals, EffortShootingFeralsWithJudas), 
+#                     by=c("EVENT_ID", "Date", "Year", "Month", "Region")]
+runs <- judas.master[SEARCHED == "YES", .(N_FeralsWithJudas=sum(N_Ferals),
+                         EffortShootingFeralsWithJudas=sum(EffortShootingFeralsWithJudas)), 
+                     by=c("Date", "Year", "Month", "Region")]
+ncollared <- judas.master[ACTION == "COLLARED", .(Ncollared=.N),
+                          by=c("Date", "Year", "Month", "Region")]
+nshot <- judas.master[ACTION == "SHOT", .(N_JudasShot=.N),
+                          by=c("Date", "Year", "Month", "Region")]
+njudasTracked <- judas.master[SEARCHED == "YES", .(N_JudasTracked=.N), 
+                              by=c("Date", "Year", "Month", "Region")]
+judas.dead <- judas.master[ACTION == "DEAD", .(N_JudasDead=.N), 
+                           by=c("Date", "Year", "Month", "Region")]
 
 # Merge together
-runs <- merge(runs, ncollared, all.x=T, 
-              on=c("Date", "Year", "Month", "Region", "SurvShire"))
-runs <- merge(runs, nshot, all.x=T, 
-              on=c("Date", "Year", "Month", "Region", "SurvShire"))
+runs <- merge(runs, ncollared, all.x=T, on=c("Date", "Year", "Month", "Region"))
+runs <- merge(runs, nshot, all.x=T, on=c("Date", "Year", "Month", "Region"))
+runs <- merge(runs, njudasTracked, all.x=T, on=c("Date", "Year", "Month", "Region"))
+runs <- merge(runs, judas.dead, all.x=T, on=c("Date", "Year", "Month", "Region"))
 
-runs_month <- runs[, .(NdayTrips=.N, N_JUdasTracked=sum(N_JUdasTracked, na.rm=T),
+# Note all=T here. That is because there are some dates that are not in the judas data
+runs <- merge(runs, opp.shoot.days, all=TRUE, on=c("Date", "Year", "Month", "Region"))
+
+runs <- runs[Year < 2018,]
+
+# Replace NA 
+replace.na <- function(DT, col_names) {
+  for (j in col_names)
+    set(DT,which(is.na(DT[[j]])),j,0)
+}
+
+col_names <- c("N_FeralsWithJudas", "EffortShootingFeralsWithJudas", "Ncollared",
+               "N_JudasShot", "N_Ferals", "N_Horses", "N_Camels", "N_JudasDead",
+               "EffortShootingHorses", "EffortShootingCamel", "EffortShootingFerals")
+
+replace.na(runs, col_names)
+
+# Update judasTracked removing judas collared
+runs[!is.na(N_JudasTracked), N_JudasTracked:=N_JudasTracked - Ncollared]
+
+runs[Ncollared==0, summary(N_JudasTracked), by=Region]
+runs[Ncollared==0, quantile(N_JudasTracked, probs = 0.90, na.rm = T), by=Region]
+runs[, summary(N_JudasTracked), by=Region]
+runs[N_JudasTracked>100,]
+runs[is.na(N_JudasTracked),]
+runs[N_JudasTracked>30, .N]
+
+ggplot(runs[Ncollared==0,], aes(N_JudasTracked)) + geom_histogram(bins = 185) +facet_grid(Region~.)
+ggsave(filename = file.path(data.path, "Analysis", "N_JudasTracked.pdf"))
+
+runs[, N_JudasTracked := ifelse(is.na(N_JudasTracked), 15, N_JudasTracked)]
+
+runs[, AdjNdayTrips:=ifelse(N_JudasTracked/30>1, ceiling(N_JudasTracked/30), 1)]
+
+runs_years <- runs[, .(NdayTrips=.N, AdjNdayTrips=sum(AdjNdayTrips), 
+                       N_JudasTracked=sum(N_JudasTracked, na.rm=T),
                        Ncollared=sum(Ncollared, na.rm=T),
                        N_JudasShot=sum(N_JudasShot, na.rm=T),
-                       N_Ferals=sum(N_Ferals, na.rm=T)), 
-                   by=c("Year", "Month", "Region", "SurvShire")]
+                       N_JudasDead=sum(N_JudasDead),
+                       N_FeralsWithJudas=sum(N_FeralsWithJudas, na.rm = T),
+                       N_Ferals=sum(N_Ferals, na.rm=T),
+                       N_Horses=sum(N_Horses, na.rm = T),
+                       N_Camels=sum(N_Camels, na.rm = T),
+                       EffortShootingFeralsWithJudas=sum(EffortShootingFeralsWithJudas),
+                       EffortShootingFerals=sum(EffortShootingFerals),
+                       EffortShootingHorses=sum(EffortShootingHorses),
+                       EffortShootingCamel=sum(EffortShootingCamel)), 
+                   by=c("Year", "Region")]
 
-runs_month <- merge(runs_month, opp.shoot_month, all=TRUE, 
-                    on=c("Year", "Month", "Region", "SurvShire"))
-####
-runs_month <- runs_month[TrackedShire != "other",]
-runs_month <- runs_month[Year < 2018,]
+# Totals harveted 
+runs_years[, Judas.culling:=N_FeralsWithJudas + N_JudasShot + N_JudasDead] 
+runs_years[, Total_Harvest:=sum(Judas.culling) + sum(N_Ferals), by=Year]
 
-runs_month[, summary(N_JUdasTracked)]
+runs_years[, Effort_judas:=
+             N_JudasTracked * 6.5/30 + # Baseline effort: time allocated to tracked a judas when no shoot 
+             # occurs (obtained by dividing the flying time (6.5 hrs) by the 
+             # max number of judas taht can be tracked in a day
+             EffortShootingFeralsWithJudas +
+             N_JudasShot * 10/3600]
 
-runs_month <- runs_month[, 
-                         Effort_opp:=N * 6.5 - Ncollared * 0.5 - N_shot * 0.08 - Effort_judas]
-surveyed_months <- runs_month[, .N, by=c("Region", "TrackedShire", "Month")]
+runs_years <- runs_years[, Effort_opp:=AdjNdayTrips * 6.5 - # Flying time
+                           Ncollared * 0.5 - # half hr to collar
+                           N_JudasShot * 300/3600 - # 5' to recover the collars
+                           EffortShootingFeralsWithJudas -
+                           EffortShootingHorses -
+                           EffortShootingCamel]
 
-runs_month[, summary(Effort_opp)]
-runs_month[, summary(Effort_judas)]
-runs_month[Effort_opp<0,]
-runs_year <- runs_month[, .(Effort_opp=sum(Effort_opp), 
-                            Effort_judas=sum(Effort_judas)), 
-                      by=c("Year", "Region", "TrackedShire")]
+ggplot(runs_years) + geom_histogram(aes(EffortShootingHorses), alpha=0.5, fill="blue") +
+  geom_histogram(aes(EffortShootingCamel), fill="yellow", alpha=0.5)
+
+#surveyed_months <- runs_years[, .N, by=c("Region", "TrackedShire", "Month")]
+
+runs_years[, summary(Effort_opp)]
+runs_years[, summary(Effort_judas)]
+
+# Long format
+runs_years_long <- melt(runs_years, id.vars = c("Year", "Region"),
+                        measure.vars = c("Judas.culling", "N_Ferals"),
+                        variable.name = "Method", value.name = "N_Donkeys")
+
+Effort_years_long <- melt(runs_years, id.vars = c("Year", "Region"),
+                        measure.vars = c("Effort_judas", "Effort_opp"),
+                        variable.name = "Method", value.name = "Effort")
+
+runs_years_long[, Effort:=Effort_years_long[, Effort]]
+runs_years_long <- merge(runs_years_long, 
+                         runs_years[, .(Year, Region, N_Horses, N_Camels, Total_Harvest)], 
+                         all.x = T,
+                         by=c("Year", "Region"))
+
+runs_years_long[, Method:=ifelse(Method == "N_Ferals", "Opportunistic", "Judas")]
+
+ggplot(runs_years_long, aes(Year, N_Donkeys, colour=Region, shape=Method)) + geom_point() + 
+  geom_line(aes(Year, Total_Harvest), colour="black")
+ggsave(filename=file.path(data.path, "Analysis", "TotalHarvest.pdf"))
+
+write.csv(runs_years, file=file.path(data.path, "tot.harvest.wide.csv"), row.names=F)
+write.csv(runs_years_long, file=file.path(data.path, "tot.harvest.long.csv"), row.names=F)
+
+ggplot(runs_years_long, aes(Year, Effort, fill=Method)) + 
+  geom_histogram(stat="identity") +
+  facet_grid(Region~.) + ylab("Effort")
+ggsave(filename = file.path(data.path, "Analysis", "Effort_Year.pdf"))
 
 # Number of year of the program per region
-runs_month[, .(Min=min(Year), Max=max(Year), nYear=max(Year) - min(Year)), 
+runs_years[, .(Min=min(Year), Max=max(Year), nYear=max(Year) - min(Year)), 
            by=Region]
 
-ggplot(surveyed_months, aes(factor(Month), N)) + geom_histogram(stat="identity") + 
-  facet_grid(TrackedShire~Region) + geom_hline(yintercept=19, col="red") + 
-  geom_hline(yintercept=23, col="blue")
 
-ggplot(data=runs_month, aes(x=factor(Month), y=Year)) +
-  geom_raster(aes(fill=N), interpolate=F) +
-  scale_fill_gradient(low="yellow", high="red") + facet_grid(TrackedShire~Region)
+p_Effort_harvest <- ggplot(runs_years_long, aes(Year, Effort)) + 
+  geom_point(aes(size=N_Donkeys, col=N_Donkeys)) +
+  scale_colour_gradient(low="yellow", high="red") + facet_grid(Region~Method)
+p_Effort_harvest
 
-write.csv(runs_month, file.path(data.path, "Effort.csv"), row.names=F)  
-write.csv(judas.master, file.path(data.path, "judas.master.Effort.csv"), row.names=F)  
-
-#### Total Harvest ####
-
-# Add col Method
-opp.shoot[, Method := "Opportunistic"]
-
-# Cross check dates
-opp.dates <- opp.shoot[, .(NC=sum(N_Camels)), by=c("Date", "TrackedShire")]
-judas.dates <- judas.master[, .(NF=sum(N_Ferals)), by=c("Date", "TrackedShire")]
-test_dates <- merge(opp.dates[, .(NC=sum(NC)), by=Date], 
-                         judas.dates[, .(NF=sum(NF)), by=Date], 
-                         all.x=T, on="Date")
-test_dates_Shire <- merge(opp.dates, judas.dates, all.x=T, on=c("TrackedShire", "Date"))
-test_dates[is.na(NF), ]
-test_dates_Shire[is.na(NF), ]
-nrow(test_dates_Shire[is.na(NF), ])
-
-sum(opp.shoot[, Date] %in% judas.master[, Date])
-sum(judas.master[, Date] %in% opp.shoot[, Date])
-
-# combine opportunistic and judas culling
-setkey(judas.master, EVENT_ID)
-judas.culling <- judas.master[unique(EVENT_ID), 
-                              names(judas.master)[c(1:4, 6:8, 12, 18)], 
-                              with=FALSE, mult="first"]
-judas.culling <- judas.culling[N_Ferals > 0,]
-judas.culling[, Method := "Judas"]
-judas.dead <- judas.master[ACTION == "DEAD" | ACTION == "SHOT", 
-                           names(judas.master)[c(1:5, 6:8, 12, 14, 18)], with=FALSE]
-
-# cross check that judas don't appear twice
-nrow(judas.dead) == length(
-  jd_ID<-(judas.master[ACTION == "DEAD" | ACTION == "SHOT", unique(JUDAS_ID)]))
-
-# find out which ones appear twice. I'm removing the dead entries not to have duplicates. 
-# I have to confirm with Magda what happened here
-jd <- judas.dead[, .N, by=JUDAS_ID]
-judas.dead <- judas.dead[!(JUDAS_ID == jd[N>1, JUDAS_ID] & ACTION == "DEAD"),]
-
-# Set N_Ferals=1 and rm cols that are not needed
-judas.dead[, N_Ferals := 1]
-judas.dead[, Method := "Judas"]
-judas.dead[, ':='(JUDAS_ID=NULL, ACTION=NULL)]
-
-tot.harvest <- rbindlist(list(judas.culling, opp.shoot, judas.dead), 
-                         use.names=TRUE, fill=TRUE)
-
-# Add months and years
-tot.harvest[, ':='(Month=month(Date), Year=year(Date))]
-
-totals <- tot.harvest[, .(N=sum(N_Ferals)), 
-                      by=c("Year", "Region", "TrackedShire", "Method")]
-totals_Region <- totals[, .(N=sum(N)), by=c("Year", "Region", "Method")]
-totals_Region[, Total := sum(N), by=Year]
-
-
-ggplot(totals_Region, aes(Year, N, colour=Region, shape=Method)) + geom_point() + 
-  geom_line(aes(Year, Total), colour="black")
-
-ggsave(filename=file.path(data.path, "Analysis", "TotalHarvest.pdf"))
-write.csv(tot.harvest, file=file.path(data.path, "tot.harvest.csv"), row.names=F)
-write.csv(totals, file=file.path(data.path, "totals.csv"), row.names=F)
-
-#### Combine in the same table ###
-#setnames(runs_year, "REGION", "Region")
-TotalHarvest_Effort <- merge(totals, runs_year, all.x=T, 
-                             on=c("Year", "Region", "TrackedShire"))
-write.csv(TotalHarvest_Effort, file=file.path(data.path, "totals_with_effort.csv"), 
-          row.names=F)
-
-TotalHarvest_Effort[, summary(Effort_opp)]
-TotalHarvest_Effort[, summary(log(Effort_opp))]
-TotalHarvest_Effort[, summary(log(Effort_judas+1))]
-
-
-p_EffOpp <- ggplot(TotalHarvest_Effort[Method == "Opportunistic" & TrackedShire != "other",], 
-       aes(Year, log(Effort_opp))) + geom_point(aes(size=N, col=N)) +
-  scale_colour_gradient(low="yellow", high="red") + facet_grid(TrackedShire~.)
-
-p_EffJudas <- ggplot(TotalHarvest_Effort[Method == "Judas" & TrackedShire != "other",], 
-                   aes(Year, log(Effort_judas + 1))) + geom_point(aes(size=N, col=N)) +
-  scale_colour_gradient(low="yellow", high="red") + facet_grid(TrackedShire~.)
-
-ggsave(filename = file.path(data.path, "Plot_Harvest_effort_Opportunistic.pdf"), plot = p_EffOpp)
-ggsave(filename = file.path(data.path, "Plot_Harvest_effort_judas.pdf"), plot = p_EffJudas)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+ggsave(filename = file.path(data.path, "Plot_Harvest_effort.pdf"), plot = p_Effort_harvest)
