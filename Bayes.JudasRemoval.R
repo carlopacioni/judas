@@ -62,8 +62,6 @@ sd(check_fit.KM$Judas.culling - check_fit.KM$judas.est)
 mean(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
 sd(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
 
-print(fit.KM, digits=3)
-
 #### Fit model to PB data ####
 runs_years_PB <- runs_years[Region == "PILBARA",]
 data <- list(nyears=nrow(runs_years_PB), n=runs_years_PB[, .(Judas.culling, N_Ferals)], 
