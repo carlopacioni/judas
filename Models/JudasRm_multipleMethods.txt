@@ -2,7 +2,7 @@ model {
   # priors
   N0 ~ dpois(lam) # Initial pop size
   log(lam) <- phi 
-  phi ~ dnorm(8.5, 0.1) # Log of the mean initial pop size. 
+  phi ~ dunif(6, 12) # Log of the mean initial pop size. 
   
   for(j in 1:nmethods) {
   alpha[j] ~ dnorm(0, 0.1) # Log removal rate (per unit of effort) for method j
