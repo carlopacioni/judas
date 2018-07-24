@@ -232,6 +232,7 @@ ggsave(filename=file.path(data.path, "Analysis", "TotalHarvest.pdf"))
 
 write.csv(runs_years, file=file.path(data.path, "tot.harvest.wide.csv"), row.names=F)
 write.csv(runs_years_long, file=file.path(data.path, "tot.harvest.long.csv"), row.names=F)
+save(list=c("runs_years", "runs_years_long"), file=file.path(data.path, "runs.rda"))
 
 ggplot(runs_years_long, aes(Year, Effort, fill=Method)) + 
   geom_histogram(stat="identity") +
