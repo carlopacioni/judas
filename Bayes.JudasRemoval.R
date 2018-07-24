@@ -2,6 +2,7 @@ library(jagsUI)
 
 # Prep data and fit model
 data.path <- "../Data"
+dir.create(file.path(data.path, "Analysis"))
 analysis.path <- "../Data/Analysis"
 load(file.path(data.path, "runs.rda"))
 
