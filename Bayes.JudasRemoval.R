@@ -111,4 +111,37 @@ sd(check_fit.PB$Judas.culling - check_fit.PB$judas.est)
 mean(check_fit.PB$N_Ferals - check_fit.PB$opp.est)
 sd(check_fit.PB$N_Ferals - check_fit.PB$opp.est)
 
+#------------------------------------------------------------------------------#
+
+# Fit with fixed roi
+fit.PB.roi = jags(data, inits, params, model.file="./Models/JudasRm_multipleMethods_Fixed_roi.txt", 
+              n.chains=nc, n.iter=ni, n.burnin=nb, 
+              n.thin=nt, parallel=ifelse(nc>1, TRUE, FALSE), 
+              n.cores=ifelse(floor(nc/np) < np, nc, np))
+
+print(fit.PB.roi, digits=3)
+sapply(fit.PB.roi$n.eff, summary)
+sapply(fit.PB.roi$Rhat, summary)
+
+# Plot fit
+n.est <- fit.PB.roi$mean$p * cbind(fit.PB.roi$mean$pop, fit.PB.roi$mean$pop)
+check_fit.PB.roi <- data.frame(runs_years_PB[, .(Year, Judas.culling, N_Ferals)], 
+                           judas.est=n.est[, 1], opp.est=n.est[,2])
+
+ggplot(check_fit.PB.roi) + geom_point(aes(Year, Judas.culling), col="blue", shape=16) + 
+  geom_point(aes(Year, judas.est), col="red", shape=16) +
+  geom_point(aes(Year, N_Ferals), col="blue", shape=7) +
+  geom_point(aes(Year, opp.est), col="red", shape=7) +
+  ylab("Number of animals removed")
+
+ggsave(filename=file.path(analysis.path, "Judas_Rm_Mod_fit_PB_roi.pdf"))
+
+# Mean difference and sd  of judas and opportunistic
+mean(check_fit.PB.roi$Judas.culling - check_fit.PB.roi$judas.est)
+sd(check_fit.PB.roi$Judas.culling - check_fit.PB.roi$judas.est)
+
+mean(check_fit.PB.roi$N_Ferals - check_fit.PB.roi$opp.est)
+sd(check_fit.PB.roi$N_Ferals - check_fit.PB.roi$opp.est)
+
+
 
