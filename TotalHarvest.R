@@ -155,14 +155,14 @@ replace.na(runs, col_names)
 runs[!is.na(N_JudasTracked), N_JudasTracked:=N_JudasTracked - Ncollared]
 
 runs[Ncollared==0, summary(N_JudasTracked), by=Region]
-runs[Ncollared==0, quantile(N_JudasTracked, probs = 0.90, na.rm = T), by=Region]
+runs[Ncollared==0, quantile(N_JudasTracked, probs=0.90, na.rm=T), by=Region]
 runs[, summary(N_JudasTracked), by=Region]
 runs[N_JudasTracked>100,]
 runs[is.na(N_JudasTracked),]
 runs[N_JudasTracked>30, .N]
 
-ggplot(runs[Ncollared==0,], aes(N_JudasTracked)) + geom_histogram(bins = 185) +facet_grid(Region~.)
-ggsave(filename = file.path(data.path, "Analysis", "N_JudasTracked.pdf"))
+ggplot(runs[Ncollared==0,], aes(N_JudasTracked)) + geom_histogram(bins=185) +facet_grid(Region~.)
+ggsave(filename=file.path(data.path, "Analysis", "N_JudasTracked.pdf"))
 
 runs[, N_JudasTracked := ifelse(is.na(N_JudasTracked), 15, N_JudasTracked)]
 
@@ -173,10 +173,10 @@ runs_years <- runs[, .(NdayTrips=.N, AdjNdayTrips=sum(AdjNdayTrips),
                        Ncollared=sum(Ncollared, na.rm=T),
                        N_JudasShot=sum(N_JudasShot, na.rm=T),
                        N_JudasDead=sum(N_JudasDead),
-                       N_FeralsWithJudas=sum(N_FeralsWithJudas, na.rm = T),
+                       N_FeralsWithJudas=sum(N_FeralsWithJudas, na.rm=T),
                        N_Ferals=sum(N_Ferals, na.rm=T),
-                       N_Horses=sum(N_Horses, na.rm = T),
-                       N_Camels=sum(N_Camels, na.rm = T),
+                       N_Horses=sum(N_Horses, na.rm=T),
+                       N_Camels=sum(N_Camels, na.rm=T),
                        EffortShootingFeralsWithJudas=sum(EffortShootingFeralsWithJudas),
                        EffortShootingFerals=sum(EffortShootingFerals),
                        EffortShootingHorses=sum(EffortShootingHorses),
@@ -210,18 +210,18 @@ runs_years[, summary(Effort_opp)]
 runs_years[, summary(Effort_judas)]
 
 # Long format
-runs_years_long <- melt(runs_years, id.vars = c("Year", "Region"),
-                        measure.vars = c("Judas.culling", "N_Ferals"),
-                        variable.name = "Method", value.name = "N_Donkeys")
+runs_years_long <- melt(runs_years, id.vars=c("Year", "Region"),
+                        measure.vars=c("Judas.culling", "N_Ferals"),
+                        variable.name="Method", value.name="N_Donkeys")
 
-Effort_years_long <- melt(runs_years, id.vars = c("Year", "Region"),
-                        measure.vars = c("Effort_judas", "Effort_opp"),
-                        variable.name = "Method", value.name = "Effort")
+Effort_years_long <- melt(runs_years, id.vars=c("Year", "Region"),
+                        measure.vars=c("Effort_judas", "Effort_opp"),
+                        variable.name="Method", value.name="Effort")
 
 runs_years_long[, Effort:=Effort_years_long[, Effort]]
 runs_years_long <- merge(runs_years_long, 
                          runs_years[, .(Year, Region, N_Horses, N_Camels, Total_Harvest)], 
-                         all.x = T,
+                         all.x=T,
                          by=c("Year", "Region"))
 
 runs_years_long[, Method:=ifelse(Method == "N_Ferals", "Opportunistic", "Judas")]
@@ -236,7 +236,7 @@ write.csv(runs_years_long, file=file.path(data.path, "tot.harvest.long.csv"), ro
 ggplot(runs_years_long, aes(Year, Effort, fill=Method)) + 
   geom_histogram(stat="identity") +
   facet_grid(Region~.) + ylab("Effort")
-ggsave(filename = file.path(data.path, "Analysis", "Effort_Year.pdf"))
+ggsave(filename=file.path(data.path, "Analysis", "Effort_Year.pdf"))
 
 # Number of year of the program per region
 runs_years[, .(Min=min(Year), Max=max(Year), nYear=max(Year) - min(Year)), 
@@ -257,3 +257,4 @@ p_CumEffort_harvest <- ggplot(CumEffort_harvest, aes(CumEff, CumHarvest)) +
   geom_point(shape=1) + facet_grid(Region~Method) 
 p_CumEffort_harvest
 
+ggsave(filename=file.path(data.path, "Plot_CumEffort_harvest.pdf"), plot=p_CumEffort_harvest)
