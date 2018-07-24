@@ -248,4 +248,12 @@ p_Effort_harvest <- ggplot(runs_years_long, aes(Year, Effort)) +
   scale_colour_gradient(low="yellow", high="red") + facet_grid(Region~Method)
 p_Effort_harvest
 
-ggsave(filename = file.path(data.path, "Plot_Harvest_effort.pdf"), plot = p_Effort_harvest)
+ggsave(filename=file.path(data.path, "Plot_Harvest_effort.pdf"), plot=p_Effort_harvest)
+
+CumEffort_harvest <- runs_years_long[, .(CumEff=cumsum(Effort), CumHarvest=cumsum(N_Donkeys)), 
+                by=c("Region", "Method")]
+
+p_CumEffort_harvest <- ggplot(CumEffort_harvest, aes(CumEff, CumHarvest)) + 
+  geom_point(shape=1) + facet_grid(Region~Method) 
+p_CumEffort_harvest
+
