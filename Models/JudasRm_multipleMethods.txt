@@ -1,0 +1,30 @@
+model {
+  # priors
+  N0 ~ dpois(lam) # Initial pop size
+  log(lam) <- phi 
+  phi ~ dnorm(8.5, 0.1) # Log of the mean initial pop size. 
+  
+  for(j in 1:nmethods) {
+  alpha[j] ~ dnorm(0, 0.1) # Log removal rate (per unit of effort) for method j
+  }
+                            
+  roi ~ dunif(1, 1.3) # Growth rate
+  #roi<- 1.2
+  
+  # Model
+  pop[1] <- N0
+  N[1] <- pop[1] - sum(n[1, ])
+  
+  for(t in 2:nyears) {
+    pop[t] ~ dpois(N[t-1] * roi) # pop is the vector of pop size before removal
+    N[t] <- pop[t] - sum(n[t, ]) # N is the vector of pop size after removal
+  }
+  
+  for(t in 1:nyears) {
+    for(j in 1:nmethods) {
+    cloglog(p[t, j])<- alpha[j] + log(eff[t, j]) # eff is the effort matrix with years as rows and methods as column
+    n[t, j] ~ dbin(p[t, j], pop[t]) # n is a matix with years as rows and methods as column.
+    }
+  }
+  
+}
