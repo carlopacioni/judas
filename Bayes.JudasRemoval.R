@@ -15,7 +15,6 @@ runs_years_long[, .(minlog=log(min(N_Donkeys/Effort)),
 # arguments for bugs()
 params = c("alpha","roi","N0","N", "pop", "p")
 
-
 #### Fit model to KM data ####
 runs_years_KM <- runs_years[Region == "KIMBERLEY",]
 data <- list(nyears=nrow(runs_years_KM), n=runs_years_KM[, .(Judas.culling, N_Ferals)], 
@@ -142,5 +141,65 @@ sd(check_fit.PB.roi$Judas.culling - check_fit.PB.roi$judas.est)
 mean(check_fit.PB.roi$N_Ferals - check_fit.PB.roi$opp.est)
 sd(check_fit.PB.roi$N_Ferals - check_fit.PB.roi$opp.est)
 
+
+#### Fit model to both pops' data ####
+yrs_diff <- nrow(runs_years_KM) - nrow(runs_years_PB)
+data <- list(nyears=c(nrow(runs_years_KM), nrow(runs_years_PB)), 
+             n=array(c(runs_years_KM[, Judas.culling], runs_years_KM[, N_Ferals], 
+                         runs_years_PB[, Judas.culling], rep(NA, yrs_diff),
+                           runs_years_PB[, N_Ferals], rep(NA, yrs_diff)), c(24, 2, 2)), 
+             eff=array(c(runs_years_KM[, Effort_judas], runs_years_KM[, Effort_opp],
+                         runs_years_PB[, Effort_judas], rep(NA, yrs_diff),
+                         runs_years_PB[, Effort_opp], rep(NA, yrs_diff)),
+                       c(24, 2, 2)),
+                         nmethods=2, npops=2)
+
+inits <- function() {
+  #list(a=rnorm(5,0,1), b=rnorm(5,0,1),u=10, prior.p= runif(1),log.eta=10)
+  list(alpha=runif(2, -10, 0), phi=c(runif(1, 8, 12), runif(1, 6, 8)),
+       pop=matrix(round(c(runs_years_KM[, Judas.culling + N_Ferals]/0.2, 
+                          runs_years_PB[, Judas.culling + N_Ferals]/0.2, 
+                          rep(NA, yrs_diff))), ncol=2))
+}
+
+# call to JAGS
+ni<- 20000
+nb<- 10000
+nt<- 1
+nc<- 1
+np <- 8 # Number of CPUs
+
+params = c("alpha","roi","N0","N", "pop", "p", "n.est")
+
+fit.both = jags(data, inits, params, model.file="./Models/JudasRm_multipleMethods_multPops.txt", 
+              n.chains=nc, n.iter=ni, n.burnin=nb, 
+              n.thin=nt, parallel=ifelse(nc>1, TRUE, FALSE), 
+              n.cores=ifelse(floor(nc/np) < np, nc, np))
+
+print(fit.both, digits=3)
+sapply(fit.both$n.eff, summary)
+sapply(fit.both$Rhat, summary)
+plot(fit.both)
+
+# Plot fit
+
+n.est <- fit.both$mean$p * cbind(fit.both$mean$pop, fit.both$mean$pop)
+check_fit.both <- data.frame(runs_years_KM[, .(Year, Judas.culling, N_Ferals)], 
+                             judas.est=n.est[, 1], opp.est=n.est[,2])
+
+ggplot(check_fit.KM) + geom_point(aes(Year, Judas.culling), col="blue", shape=16) + 
+  geom_point(aes(Year, judas.est), col="red", shape=16) +
+  geom_point(aes(Year, N_Ferals), col="blue", shape=7) +
+  geom_point(aes(Year, opp.est), col="red", shape=7) +
+  ylab("Number of animals removed")
+
+ggsave(filename=file.path(analysis.path, "Judas_Rm_Mod_fit_both.pdf"))
+
+# Mean difference and sd  of judas and opportunistic
+mean(check_fit.KM$Judas.culling - check_fit.KM$judas.est)
+sd(check_fit.KM$Judas.culling - check_fit.KM$judas.est)
+
+mean(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
+sd(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
 
 
