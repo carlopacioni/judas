@@ -28,8 +28,17 @@ model {
     for(j in 1:nmethods) {
      cloglog(p[t, j, pn]) <- alpha[pn, j] + log(eff[t, j, pn]) # eff is the effort matrix with years as rows and methods as column
      n[t, j, pn] ~ dbin(p[t, j, pn], pop[t, pn]) # n is a matix of number of removed with years as rows and methods as column.
-	 n.est[t, j, pn] <- p[t, j, pn] * pop[t, pn] # model estimate of n
+     n.est[t, j, pn] <- p[t, j, pn] * pop[t, pn] # model estimate of n
+     E.est[t, j, pn] <- pow((n[t, j, pn] - n.est[t, j, pn]),2)/(n.est[t, j, pn] + 0.5) # Chi-square error - + 0.5 is needed to ensure no division by zero
+	 
+	 # Simulated dataset and chi-square on simulated dataset
+	 n.sim[t, j, pn] ~ dbin(p[t, j, pn], pop[t, pn])
+	 E.sim[t, j, pn] <- pow((n.sim[t, j, pn] - n.est[t, j, pn]),2)/(n.est[t, j, pn] + 0.5) # Chi-square error - + 0.5 is needed to ensure no division by zero
     }
    }
+   fit.pn[pn] <- sum(E.est[1:nyears[pn], , pn])
+   fit.sim.pn[pn] <- sum(E.sim[1:nyears[pn], , pn])
   }
+  fit <- sum(fit.pn)
+  fit.sim <- sum(fit.sim.pn)
 }

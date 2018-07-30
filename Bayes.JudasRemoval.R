@@ -1,3 +1,5 @@
+library(data.table)
+library(ggplot2)
 library(jagsUI)
 
 # Prep data and fit model
@@ -45,7 +47,8 @@ plot(fit.KM)
 
 # Plot fit
 n.est <- fit.KM$mean$p * cbind(fit.KM$mean$pop, fit.KM$mean$pop)
-check_fit.KM <- data.frame(runs_years_KM[, .(Year, Judas.culling, N_Ferals)], judas.est=n.est[, 1], opp.est=n.est[,2])
+check_fit.KM <- data.frame(runs_years_KM[, .(Year, Judas.culling, N_Ferals)], 
+                           judas.est=n.est[, 1], opp.est=n.est[,2])
 
 ggplot(check_fit.KM) + geom_point(aes(Year, Judas.culling), col="blue", shape=16) + 
   geom_point(aes(Year, judas.est), col="red", shape=16) +
@@ -61,6 +64,7 @@ sd(check_fit.KM$Judas.culling - check_fit.KM$judas.est)
 
 mean(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
 sd(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
+#------------------------------------------------------------------------------#
 
 #### Fit model to PB data ####
 runs_years_PB <- runs_years[Region == "PILBARA",]
@@ -141,7 +145,7 @@ sd(check_fit.PB.roi$Judas.culling - check_fit.PB.roi$judas.est)
 
 mean(check_fit.PB.roi$N_Ferals - check_fit.PB.roi$opp.est)
 sd(check_fit.PB.roi$N_Ferals - check_fit.PB.roi$opp.est)
-
+#------------------------------------------------------------------------------#
 
 #### Fit model to both pops' data ####
 yrs_diff <- nrow(runs_years_KM) - nrow(runs_years_PB)
@@ -170,7 +174,7 @@ nt<- 100
 nc<- 4
 np <- 8 # Number of CPUs
 
-params = c("alpha","roi","N0","N", "pop", "n.est")
+params = c("alpha","roi","N0", "fit", "fit.sim", "N", "pop", "n.est", "n.sim")
 
 fit.both = jags(data, inits, params, model.file="./Models/JudasRm_multipleMethods_multPops.txt", 
               n.chains=nc, n.iter=ni, n.burnin=nb, 
@@ -199,14 +203,21 @@ ggplot(ns) + geom_point(aes(Year, Judas.culling), col="blue", shape=16) +
 ggsave(filename=file.path(analysis.path, "Judas_Rm_Mod_fit_both.pdf"))
 
 # Mean difference and sd  of judas and opportunistic
-mean(check_fit.KM$Judas.culling - check_fit.KM$judas.est)
-sd(check_fit.KM$Judas.culling - check_fit.KM$judas.est)
+mean(ns$Judas.culling - ns$judas.est)
+sd(ns$Judas.culling - ns$judas.est)
 
-mean(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
-sd(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
+mean(ns$N_Ferals - ns$opp.est)
+sd(ns$N_Ferals - ns$opp.est)
 
+fit.both$mean$fit/fit.both$mean$fit.sim
+mean(fit.both$sims.list$fit.sim > fit.both$sims.list$fit)
 
-# Fit model to both pops' data with two alpha
+ggplot(data.frame(fit=fit.both$sims.list$fit, fit.sim=fit.both$sims.list$fit.sim),
+       aes(fit, fit.sim)) + geom_point() + xlim(c(0, 15000)) + ylim(c(0, 15000)) +
+  geom_abline(aes(slope=1, intercept=0), col="red")
+#------------------------------------------------------------------------------#
+
+# Fit model to both pops' data with two alphas
 yrs_diff <- nrow(runs_years_KM) - nrow(runs_years_PB)
 data <- list(nyears=c(nrow(runs_years_KM), nrow(runs_years_PB)), 
              n=array(c(runs_years_KM[, Judas.culling], runs_years_KM[, N_Ferals], 
@@ -233,8 +244,6 @@ nt<- 100
 nc<- 4
 np <- 8 # Number of CPUs
 
-params = c("alpha","roi","N0","N", "pop", "n.est")
-
 fit.both.2a = jags(data, inits, params, model.file="./Models/JudasRm_multipleMethods_multPops_sepAlpha.txt", 
                 n.chains=nc, n.iter=ni, n.burnin=nb, 
                 n.thin=nt, parallel=ifelse(nc>1, TRUE, FALSE), 
@@ -244,6 +253,39 @@ print(fit.both.2a, digits=3)
 sapply(fit.both.2a$n.eff, summary)
 sapply(fit.both.2a$Rhat, summary)
 plot(fit.both.2a)
+
+# Plot fit
+ns <- rbind(fit.both.2a$mean$n.est[, , 1], fit.both.2a$mean$n.est[1:20, , 2])
+ns <- as.data.frame(cbind(ns, c(runs_years_KM[, Judas.culling], runs_years_PB[, Judas.culling]),
+                          c(runs_years_KM[, N_Ferals], runs_years_PB[, N_Ferals])))
+
+ns <- cbind(Year=c(1994:2017, 1998:2017), Pop=c(rep("KM", 24), rep("PB", 20)), ns)
+names(ns)[3:6] <- c("judas.est", "opp.est", "Judas.culling", "N_Ferals")
+
+ggplot(ns) + geom_point(aes(Year, Judas.culling), col="blue", shape=16) + 
+  geom_point(aes(Year, judas.est), col="red", shape=16) +
+  geom_point(aes(Year, N_Ferals), col="blue", shape=7) +
+  geom_point(aes(Year, opp.est), col="red", shape=7) +
+  ylab("Number of animals removed") + facet_grid(Pop~.)
+
+ggsave(filename=file.path(analysis.path, "Judas_Rm_Mod_fit_both.2a.pdf"))
+
+# Mean difference and sd  of judas and opportunistic
+mean(ns$Judas.culling - ns$judas.est)
+sd(ns$Judas.culling - ns$judas.est)
+
+mean(ns$N_Ferals - ns$opp.est)
+sd(ns$N_Ferals - ns$opp.est)
+
+fit.both.2a$mean$fit/fit.both.2a$mean$fit.sim
+mean(fit.both.2a$sims.list$fit.sim > fit.both.2a$sims.list$fit)
+
+ggplot(data.frame(fit=fit.both.2a$sims.list$fit, fit.sim=fit.both.2a$sims.list$fit.sim),
+       aes(fit, fit.sim)) + geom_point() + xlim(c(0, 10000)) + ylim(c(0, 10000)) +
+  geom_abline(aes(slope=1, intercept=0), col="red")
+
+ggsave(filename=file.path(analysis.path, "Judas_Rm_Mod_discrep_fit_both.2a.pdf"))
+#------------------------------------------------------------------------------#
 
 # Fit model to both pops' data with two alphas and fixed roi
 yrs_diff <- nrow(runs_years_KM) - nrow(runs_years_PB)
@@ -272,8 +314,6 @@ nt<- 10
 nc<- 4
 np <- 8 # Number of CPUs
 
-params = c("alpha","roi","N0","N", "pop", "n.est")
-
 fit.both.2a.Froi = jags(data, inits, params, model.file="./Models/JudasRm_multMtds_multPops_sepAlpha_Fixed_roi.txt", 
                    n.chains=nc, n.iter=ni, n.burnin=nb, 
                    n.thin=nt, parallel=ifelse(nc>1, TRUE, FALSE), 
@@ -284,11 +324,41 @@ sapply(fit.both.2a.Froi$n.eff, summary)
 sapply(fit.both.2a.Froi$Rhat, summary)
 plot(fit.both.2a.Froi)
 
+# Plot fit
+ns <- rbind(fit.both.2a.Froi$mean$n.est[, , 1], fit.both.2a.Froi$mean$n.est[1:20, , 2])
+ns <- as.data.frame(cbind(ns, c(runs_years_KM[, Judas.culling], runs_years_PB[, Judas.culling]),
+                          c(runs_years_KM[, N_Ferals], runs_years_PB[, N_Ferals])))
 
-save(list= c("fit.KM", "fit.PB", "fit.PB.roi", "fit.both", "fit.both.2a", "fit.both.2a.Froi"), 
-     file = file.path(analysis.path, "FittedMods.rda"))
+ns <- cbind(Year=c(1994:2017, 1998:2017), Pop=c(rep("KM", 24), rep("PB", 20)), ns)
+names(ns)[3:6] <- c("judas.est", "opp.est", "Judas.culling", "N_Ferals")
+
+ggplot(ns) + geom_point(aes(Year, Judas.culling), col="blue", shape=16) + 
+  geom_point(aes(Year, judas.est), col="red", shape=16) +
+  geom_point(aes(Year, N_Ferals), col="blue", shape=7) +
+  geom_point(aes(Year, opp.est), col="red", shape=7) +
+  ylab("Number of animals removed") + facet_grid(Pop~.)
+
+ggsave(filename=file.path(analysis.path, "Judas_Rm_Mod_fit_both.2a.Froi.pdf"))
+
+# Mean difference and sd  of judas and opportunistic
+mean(ns$Judas.culling - ns$judas.est)
+sd(ns$Judas.culling - ns$judas.est)
+
+mean(ns$N_Ferals - ns$opp.est)
+sd(ns$N_Ferals - ns$opp.est)
+
+fit.both.2a.Froi$mean$fit/fit.both.2a.Froi$mean$fit.sim
+mean(fit.both.2a.Froi$sims.list$fit.sim > fit.both.2a.Froi$sims.list$fit)
+
+ggplot(data.frame(fit=fit.both.2a.Froi$sims.list$fit, fit.sim=fit.both.2a.Froi$sims.list$fit.sim),
+       aes(fit, fit.sim)) + geom_point() + xlim(c(0, 10000)) + ylim(c(0, 10000)) +
+  geom_abline(aes(slope=1, intercept=0), col="red")
 
 #------------------------------------------------------------------------------#
+save(list= c("fit.KM", "fit.PB", "fit.PB.roi", "fit.both", "fit.both.2a", "fit.both.2a.Froi"), 
+     file = file.path(analysis.path, "FittedMods.rda"))
+#------------------------------------------------------------------------------#
+
 # compare the model results
 fit.both$DIC - fit.both.2a$DIC
 fit.both.2a$DIC - fit.both.2a.Froi$DIC
