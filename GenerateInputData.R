@@ -17,7 +17,70 @@ calc.latlong.dist<- function(xy1,xy2)
 
 # Start from the clean dataset generated with PreChecksJudasEff.Rmd
 data.path <- "../Data/"
-load(file = file.path(data.path, "judas.cleaned.rda"))
+judas.master <- fread(file.path(data.path, "Judas.master.TrackedShire.csv"))
+
+# Rm found dead because they are out of the program
+judas.cleaned <- judas.master[ACTION != "DEAD", ]
+
+# Rm not found because they do not contribute 
+judas.cleaned <- judas.cleaned[ACTION != "NONE", ]
+
+# Set start and end date
+judas.cleaned[, start.date := min(Date), by=JUDAS_ID]
+judas.cleaned[, end.date := max(Date), by=JUDAS_ID]
+
+# Cross check start.date matches collared
+judas.cleaned[ACTION == "COLLARED", date.coll := Date, by=JUDAS_ID]
+judas.cleaned[ACTION == "COLLARED", sum(start.date != date.coll, na.rm = T)]
+judas.cleaned[start.date != date.coll, ]
+# Some animals have been collared after their start date. This is a collar replacement
+# Rm date.coll
+judas.cleaned[, date.coll := NULL]
+
+# Length in the program
+judas.cleaned[, Time.deployment := difftime(end.date, start.date, units="weeks")]
+judas.cleaned[, Time.dep.years := round(as.numeric(Time.deployment) / 52, 2)]
+
+# Keep only animals that were tracked for less than 13 yrs. Longer time may 
+  # reflect collars moved to other animals while not changing animal IDs
+judas.cleaned <- judas.cleaned[Time.dep.years < 13, ]
+
+# Rm animals that were collared on start.date and searched and not found (Year==0)
+judas.cleaned <- judas.cleaned[Time.deployment>0, ]
+
+# Rm animals that have coordinate outside Australia
+judas.cleaned[TrackedShire == "other", .N]
+judas.cleaned <- judas.cleaned[TrackedShire != "other",]
+
+# Check whether there are judas with < 5 data points and rm
+locs <- judas.cleaned[, .N, by=JUDAS_ID]
+locs[, sum(N<6)]
+IDs.rm <- locs[N<6, JUDAS_ID]
+judas.cleaned <- judas.cleaned[!JUDAS_ID %in% IDs.rm, ]
+
+# Home Range centres
+judas.cleaned[, ':='(HRlat=mean(Latitude), HRlong=mean(Longitude)), by=JUDAS_ID]
+
+# Calculate deviations from HRcentres 
+judas.cleaned[, xdev:=calc.latlong.dist(judas.cleaned[, .(Latitude, HRlong)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, Longitude)],
+                                        judas.cleaned[, .(HRlat, HRlong)])]
+judas.cleaned[, summary(xdev)]
+judas.cleaned[, summary(ydev)]
+
+
+descr.fin <- judas.cleaned[, .(njudas=length(unique(JUDAS_ID)), 
+                               start.date=min(Date), end.date=max(Date)), 
+                           by=c("Region", "Shire")]
+descr.fin
+descr.fin[, sum(njudas)]
+write.csv(descr.fin, file = file.path(data.path, "Analysis", "descr.fin.in.surv.csv"), 
+          row.names = F)
+
+ntrack.events <- judas.cleaned[, .N, by=JUDAS_ID]
+ntrack.events[, summary(N)]
+###########################################################################
 
 names(judas.cleaned)
 setkey(judas.cleaned, JUDAS_ID)
@@ -25,7 +88,7 @@ setkey(judas.cleaned, JUDAS_ID)
 # List all info re each judas
 list.IDs <- judas.cleaned[, unique(JUDAS_ID)]
 judas.info <- judas.cleaned[list.IDs, .SD, 
-                            .SDcols=c("JUDAS_ID","REGION", "start.date", "end.date", 
+                            .SDcols=c("JUDAS_ID","Region", "start.date", "end.date", 
                                       "Time.deployment", "Time.dep.years", 
                                       "HRlong", "HRlat"),
                             mult="first"]
@@ -41,7 +104,7 @@ setnames(judas.Dist, c("JUDAS_ID", "id2"))
 setkey(judas.Dist, JUDAS_ID)
 
 judas.Dist <- merge(judas.Dist, judas.info, all.x = T)
-nms <- names(judas.Dist)[c(-1, -2)]
+nms <- c(names(judas.Dist)[c(-1, -2)])
 setnames(judas.Dist, c("JUDAS_ID", "id2", nms), 
          c("ID.1", "JUDAS_ID", sapply(nms, paste0, ".1")))
 
@@ -61,10 +124,10 @@ key(judas.cleaned) # Confirm that Judas_ID is the key
 judas.Dist[, Concurrent := 
              ifelse(end.date.1 < start.date.2 | end.date.2 < start.date.1, 'no', "yes")]
 setkey(judas.Dist, Concurrent)
-judas.Dist <- judas.Dist["yes", ] # get rid of judas that were not present at same time
+judas.Dist <- judas.Dist["yes", ] # get rid of judas pairs that were not present at same time
 
 # Keep only pairs from the same region
-judas.Dist[, RegCheck:=REGION.1 == REGION.2]
+judas.Dist[, RegCheck:=Region.1 == Region.2]
 judas.Dist <- judas.Dist[(RegCheck),]
 
 # Prepare columns
