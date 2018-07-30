@@ -15,7 +15,7 @@ runs_years_long[, .(minlog=log(min(N_Donkeys/Effort)),
                     by=c("Region", "Method")]
 
 # arguments for bugs()
-params = c("alpha","roi","N0","N", "pop", "p")
+params = c("alpha","roi","N0","N", "pop", "p", "fit", "fit.sim", "n.est", "n.sim")
 
 #### Fit model to KM data ####
 runs_years_KM <- runs_years[Region == "KIMBERLEY",]
@@ -64,6 +64,13 @@ sd(check_fit.KM$Judas.culling - check_fit.KM$judas.est)
 
 mean(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
 sd(check_fit.KM$N_Ferals - check_fit.KM$opp.est)
+
+fit.KM$mean$fit/fit.KM$mean$fit.sim
+mean(fit.KM$sims.list$fit.sim > fit.KM$sims.list$fit)
+
+ggplot(data.frame(fit=fit.KM$sims.list$fit, fit.sim=fit.KM$sims.list$fit.sim),
+       aes(fit, fit.sim)) + geom_point() + xlim(c(0, 15000)) + ylim(c(0, 15000)) +
+  geom_abline(aes(slope=1, intercept=0), col="red")
 #------------------------------------------------------------------------------#
 
 #### Fit model to PB data ####
@@ -71,7 +78,7 @@ runs_years_PB <- runs_years[Region == "PILBARA",]
 data <- list(nyears=nrow(runs_years_PB), n=runs_years_PB[, .(Judas.culling, N_Ferals)], 
              eff=runs_years_PB[, .(Effort_judas, Effort_opp)], nmethods=2)
 
-params = c("alpha","roi","N0","N", "pop", "p")
+params = c("alpha","roi","N0","N", "pop", "p", "fit", "fit.sim", "n.est", "n.sim")
 inits <- function() {
   #list(a=rnorm(5,0,1), b=rnorm(5,0,1),u=10, prior.p= runif(1),log.eta=10)
   list(alpha=c(-5, -5), phi=runif(1, 6, 8), 
@@ -114,6 +121,13 @@ sd(check_fit.PB$Judas.culling - check_fit.PB$judas.est)
 mean(check_fit.PB$N_Ferals - check_fit.PB$opp.est)
 sd(check_fit.PB$N_Ferals - check_fit.PB$opp.est)
 
+fit.PB$mean$fit/fit.PB$mean$fit.sim
+mean(fit.PB$sims.list$fit.sim > fit.PB$sims.list$fit)
+
+ggplot(data.frame(fit=fit.PB$sims.list$fit, fit.sim=fit.PB$sims.list$fit.sim),
+       aes(fit, fit.sim)) + geom_point() + xlim(c(0, 15000)) + ylim(c(0, 15000)) +
+  geom_abline(aes(slope=1, intercept=0), col="red")
+
 #------------------------------------------------------------------------------#
 
 # Fit with fixed roi
@@ -145,6 +159,13 @@ sd(check_fit.PB.roi$Judas.culling - check_fit.PB.roi$judas.est)
 
 mean(check_fit.PB.roi$N_Ferals - check_fit.PB.roi$opp.est)
 sd(check_fit.PB.roi$N_Ferals - check_fit.PB.roi$opp.est)
+
+fit.PB.roi$mean$fit/fit.PB.roi$mean$fit.sim
+mean(fit.PB.roi$sims.list$fit.sim > fit.PB.roi$sims.list$fit)
+
+ggplot(data.frame(fit=fit.PB.roi$sims.list$fit, fit.sim=fit.PB.roi$sims.list$fit.sim),
+       aes(fit, fit.sim)) + geom_point() + xlim(c(0, 15000)) + ylim(c(0, 15000)) +
+  geom_abline(aes(slope=1, intercept=0), col="red")
 #------------------------------------------------------------------------------#
 
 #### Fit model to both pops' data ####
