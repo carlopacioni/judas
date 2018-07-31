@@ -15,7 +15,7 @@ calc.latlong.dist<- function(xy1,xy2)
 }
 #------------------------------------------------------------------------------#
 
-# Start from the clean dataset generated with PreChecksJudasEff.Rmd
+# Start from judas.master dataset generated with TotalHarvest.R
 data.path <- "../Data/"
 judas.master <- fread(file.path(data.path, "Judas.master.TrackedShire.csv"))
 
@@ -140,19 +140,24 @@ judas.Dist[, ':='(SHIRE=as.character(NA), AREA=as.character(NA), EVENT_DATE=as.D
                   event=as.numeric(NA), time=as.numeric(NA), maxtime=as.numeric(NA), 
                   EVENT_ID=as.numeric(NA), EVENT_CODE=as.character(NA), 
                   ACTION=as.character(NA), 
-                  LAT=as.numeric(NA), LONG=as.numeric(NA), Habitat.Type=as.character(NA))]
+                  LAT=as.numeric(NA), LONG=as.numeric(NA), Habitat.Type=as.character(NA),
+                  Soil.Type=as.character(NA), 
+                  Capacity=as.character(NA))]
 jd.dates <- c("start.date.1", "end.date.1", "start.date.2", "end.date.2")
 judas.Dist[, (jd.dates) := lapply(.SD, as.Date), .SDcols=jd.dates]
 
-judas.cleaned[, EVENT_DATE := as.Date(EVENT_DATE)] 
+judas.cleaned[, Date := as.Date(Date)] 
 
 # summary stats
 judas.Dist[, summary(Dist)]
 
+# Apply a cut off of 50 km
+judas.Dist <- judas.Dist[Dist < 50, ]
+
 rns <- nrow(judas.Dist) # Number of judas pairs
 
 # There must be a clever way to do this, but couldn't think any...
-# This takes about 40 mins, an lapply and parallel execution would be faster, 
+# This takes about 1.5 mins, an lapply and parallel execution would be faster, 
 # but I didn't bother. Worth considering for larger datasets though.
 system.time(
 for(rn in seq_len(rns)) {
@@ -161,14 +166,16 @@ for(rn in seq_len(rns)) {
   matching.Events <- data.ID1[, EVENT_ID] %in% data.ID2[, EVENT_ID]
   data.Evs <- data.ID1[matching.Events, ]
   if(nrow(data.Evs) > 0) {
-    line.no <- which.min(data.Evs[, EVENT_DATE])
-    judas.Dist[rn, ':='(SHIRE=data.Evs[line.no, SHIRE], AREA=data.Evs[line.no, AREA], 
-                        EVENT_DATE=data.Evs[line.no, EVENT_DATE], event=1, 
+    line.no <- which.min(data.Evs[, Date])
+    judas.Dist[rn, ':='(SHIRE=data.Evs[line.no, Shire], 
+                        EVENT_DATE=data.Evs[line.no, Date], event=1, 
                         EVENT_ID=data.Evs[line.no, EVENT_ID], 
                         EVENT_CODE=data.Evs[line.no, EVENT], 
                         ACTION=data.Evs[line.no, ACTION], 
-                        LAT=data.Evs[line.no, LAT], LONG=data.Evs[line.no, LONG], 
-                        Habitat.Type=data.Evs[line.no, Habitat.Type])]
+                        LAT=data.Evs[line.no, Latitude], LONG=data.Evs[line.no, Longitude], 
+                        Habitat.Type=data.Evs[line.no, `Habitat Type`],
+                        Soil.Type=data.Evs[line.no, `Soil Type`],
+                        Capacity=data.Evs[line.no, Capacity])]
   } else {
     judas.Dist[rn, ':='(EVENT_DATE=min(end.date.1, end.date.2), event=0)]
   }
@@ -179,14 +186,12 @@ for(rn in seq_len(rns)) {
 
 write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
 save(judas.Dist, file = file.path(data.path, "judas.Dist.rda"))
+save(judas.cleaned, file = file.path(data.path, "judas.cleaned.fin.rda"))
 
 #### Balance id1 and id2 to similar counts ####
 # If resumed
 #------------------------------------------------------------------------------#
 data.path <- "../Data/"
-load(file = file.path(data.path, "judas.cleaned.rda"))
-judas.cleaned[, EVENT_DATE := as.Date(EVENT_DATE)]
-
 load(file = file.path(data.path, "judas.Dist.rda"))
 #------------------------------------------------------------------------------#
 # Compute descriptive stats of distance when event=1
@@ -213,7 +218,7 @@ counts[, summary(prop)]
 
 nrefinement <- 5
 rf <- 1
-while(rf < nrefinement | 
+while(rf <= nrefinement & 
       (counts[, quantile(prop, probs = 0.025)] < 0.4 & 
        counts[, quantile(prop, probs = 0.975)] > 0.6)) {
   for(rn in nrow(counts):1) {
@@ -247,6 +252,7 @@ while(rf < nrefinement |
       judas.Dist.Bal[sinds, ID.2:=move2ID.2]
     }
   }
+  
   ID.1cnt.table <- judas.Dist.Bal[, .(ID.1cnt=.N), by=ID.1]
   ID.2cnt.table <- judas.Dist.Bal[, .(ID.2cnt=.N), by=ID.2]
   setnames(ID.1cnt.table, "ID.1", "JUDAS_ID")
@@ -259,13 +265,15 @@ while(rf < nrefinement |
   counts[is.na(ID.2cnt), ID.2cnt:=0]
   counts[, Tot:=ID.1cnt + ID.2cnt]
   counts[, prop:=ID.1cnt/Tot]
+  message(paste("completed refinement", rf))
   rf <- rf + 1
 }
 
-rf
 counts[, quantile(prop, probs = 0.025)] 
 counts[, quantile(prop, probs = 0.975)]
 counts[, summary(prop)]
 
 # Note that data regarding ID.1 and ID.2 may be swapped now
+# To track these it should be possible to add a col "swab" and add 1 each time a 
+# line is swabbed so that it is then possible to adjust other cols
 save(judas.Dist.Bal, file = file.path(data.path, "judas.Dist.Bal.rda"))
