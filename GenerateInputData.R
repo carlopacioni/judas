@@ -69,6 +69,8 @@ judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, Longitude)],
 judas.cleaned[, summary(xdev)]
 judas.cleaned[, summary(ydev)]
 
+ggplot(judas.cleaned) + geom_density(aes(xdev), col="blue") + 
+  geom_density(aes(ydev), col="red") + xlim(c(0, 60))
 
 descr.fin <- judas.cleaned[, .(njudas=length(unique(JUDAS_ID)), 
                                start.date=min(Date), end.date=max(Date)), 
@@ -136,7 +138,7 @@ judas.Dist <- judas.Dist[(RegCheck),]
    # period when concurrently present) and when they were observed together if event=1
    # otherwise the max time when both were 'deployed'  
 # maxtime is the max time when both were 'deployed'  
-judas.Dist[, ':='(SHIRE=as.character(NA), AREA=as.character(NA), EVENT_DATE=as.Date(NA), 
+judas.Dist[, ':='(TrackedLoc=as.character(NA), EVENT_DATE=as.Date(NA), 
                   event=as.numeric(NA), time=as.numeric(NA), maxtime=as.numeric(NA), 
                   EVENT_ID=as.numeric(NA), EVENT_CODE=as.character(NA), 
                   ACTION=as.character(NA), 
@@ -152,7 +154,7 @@ judas.cleaned[, Date := as.Date(Date)]
 judas.Dist[, summary(Dist)]
 
 # Apply a cut off of 50 km
-judas.Dist <- judas.Dist[Dist < 50, ]
+judas.Dist <- judas.Dist[Dist < 100, ]
 
 rns <- nrow(judas.Dist) # Number of judas pairs
 
@@ -167,7 +169,7 @@ for(rn in seq_len(rns)) {
   data.Evs <- data.ID1[matching.Events, ]
   if(nrow(data.Evs) > 0) {
     line.no <- which.min(data.Evs[, Date])
-    judas.Dist[rn, ':='(SHIRE=data.Evs[line.no, Shire], 
+    judas.Dist[rn, ':='(TrackedLoc=data.Evs[line.no, TrackedShire], 
                         EVENT_DATE=data.Evs[line.no, Date], event=1, 
                         EVENT_ID=data.Evs[line.no, EVENT_ID], 
                         EVENT_CODE=data.Evs[line.no, EVENT], 
