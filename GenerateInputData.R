@@ -132,6 +132,17 @@ judas.Dist <- judas.Dist["yes", ] # get rid of judas pairs that were not present
 judas.Dist[, RegCheck:=Region.1 == Region.2]
 judas.Dist <- judas.Dist[(RegCheck),]
 
+# subset judas.clean to 1995-2007 for KM and 1999-2001&2007-2010 for PB (PB runthe analysis with 2 month timewindow)
+judas.cleaned[, Date := as.Date(Date)] 
+judas.cleaned.sub <- judas.cleaned[(Region == "KIMBERLEY" & 
+                                      Year >= 1994 & Year <= 2007) |
+                                     (Region == "PILBARA" & 
+                                        ((Year >= 1999 & Year <= 2001) | 
+                                           (Year >= 2007 & Year <= 2010))), ]
+
+cleanded.sub.ids <- judas.cleaned.sub[, unique(JUDAS_ID)]
+judas.Dist <- judas.Dist[ID.1 %in% cleanded.sub.ids | ID.2 %in% cleanded.sub.ids,]
+
 # Prepare columns
 # event is 0 when there is no encounter, and 1 when there is
 # time is the length of time when both were 'deployed' (the beginning of the 
@@ -148,12 +159,10 @@ judas.Dist[, ':='(TrackedLoc=as.character(NA), EVENT_DATE=as.Date(NA),
 jd.dates <- c("start.date.1", "end.date.1", "start.date.2", "end.date.2")
 judas.Dist[, (jd.dates) := lapply(.SD, as.Date), .SDcols=jd.dates]
 
-judas.cleaned[, Date := as.Date(Date)] 
-
 # summary stats
 judas.Dist[, summary(Dist)]
 
-# Apply a cut off of 50 km
+# Apply a cut off of 100 km
 judas.Dist <- judas.Dist[Dist < 100, ]
 
 rns <- nrow(judas.Dist) # Number of judas pairs
@@ -163,8 +172,8 @@ rns <- nrow(judas.Dist) # Number of judas pairs
 # but I didn't bother. Worth considering for larger datasets though.
 system.time(
 for(rn in seq_len(rns)) {
-  data.ID1 <- judas.cleaned[judas.Dist[rn, ID.1], ]
-  data.ID2 <- judas.cleaned[judas.Dist[rn, ID.2], ]
+  data.ID1 <- judas.cleaned.sub[judas.Dist[rn, ID.1], ]
+  data.ID2 <- judas.cleaned.sub[judas.Dist[rn, ID.2], ]
   matching.Events <- data.ID1[, EVENT_ID] %in% data.ID2[, EVENT_ID]
   data.Evs <- data.ID1[matching.Events, ]
   if(nrow(data.Evs) > 0) {
@@ -189,6 +198,7 @@ for(rn in seq_len(rns)) {
 write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
 save(judas.Dist, file = file.path(data.path, "judas.Dist.rda"))
 save(judas.cleaned, file = file.path(data.path, "judas.cleaned.fin.rda"))
+save(judas.cleaned.sub, file = file.path(data.path, "judas.cleaned.sub.rda"))
 
 #### Balance id1 and id2 to similar counts ####
 # If resumed
@@ -200,10 +210,11 @@ load(file = file.path(data.path, "judas.Dist.rda"))
 judas.Dist[event == 1, summary(Dist)]
 ggplot(judas.Dist[event == 1, ], aes(Dist)) + geom_density() + xlim(c(0, 100))
 
-judas.Dist.Bal <- judas.Dist
-judas.Dist.Bal[, Rn:=seq_len(nrow(judas.Dist))]
+max.Dist <- judas.Dist[event == 1, max(Dist)]
+judas.Dist.Bal <- judas.Dist[Dist <= max.Dist,]
+judas.Dist.Bal[, Rn:=seq_len(nrow(judas.Dist[Dist <= max.Dist,]))]
 
-JUDAS_ID <- unique(c(judas.Dist[, ID.1], judas.Dist[, ID.2]))
+JUDAS_ID <- unique(c(judas.Dist.Bal[, ID.1], judas.Dist.Bal[, ID.2]))
 ID.1cnt.table <- judas.Dist.Bal[, .(ID.1cnt=.N), by=ID.1]
 ID.2cnt.table <- judas.Dist.Bal[, .(ID.2cnt=.N), by=ID.2]
 setnames(ID.1cnt.table, "ID.1", "JUDAS_ID")
@@ -220,6 +231,9 @@ counts[, summary(prop)]
 
 nrefinement <- 5
 rf <- 1
+
+# ~14 secs
+system.time(
 while(rf <= nrefinement & 
       (counts[, quantile(prop, probs = 0.025)] < 0.4 & 
        counts[, quantile(prop, probs = 0.975)] > 0.6)) {
@@ -270,6 +284,7 @@ while(rf <= nrefinement &
   message(paste("completed refinement", rf))
   rf <- rf + 1
 }
+)
 
 counts[, quantile(prop, probs = 0.025)] 
 counts[, quantile(prop, probs = 0.975)]
