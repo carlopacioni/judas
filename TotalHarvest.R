@@ -140,9 +140,10 @@ runs <- merge(runs, opp.shoot.days, all=TRUE, on=c("Date", "Year", "Month", "Reg
 runs <- runs[Year < 2018,]
 survey.freq <- runs[, .N, by=c("Year", "Month", "Region")]
 survey.freq[, visit := 1]
-ggplot(survey.freq, aes(Month, N)) + geom_histogram(stat = "identity") +
-  theme_classic() + ylab("Number of visits") +
-  facet_grid(Year~Region) + scale_x_continuous(breaks = 1:12) 
+ggplot(survey.freq, aes(Month, visit)) + geom_histogram(stat = "identity") +
+  theme_classic() + ylab("Visited") +
+  facet_grid(Year~Region) + scale_x_continuous(breaks = 1:12) +
+  scale_y_continuous(breaks = 1)
 
 ggsave(file.path(data.path, "survey.month.year.pdf"))
 
