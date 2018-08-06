@@ -1,14 +1,14 @@
-data {
+#data {
 # y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
 # N1 is the number of observations (pairs); M is the number of individuals
 # time is in (integer) months
-    for (i in 1:N1) {
-    y[i,time[i]] <- d[i]   
-    for (j in 1:(time[i]-1)) {
-    y[i,j] <- 0
-      }
-    }
-  }
+#    for (i in 1:N1) {
+#    y[i,time[i]] <- d[i]   
+#    for (j in 1:(time[i]-1)) {
+#    y[i,j] <- 0
+#      }
+#    }
+#  }
     
 model  {
     
