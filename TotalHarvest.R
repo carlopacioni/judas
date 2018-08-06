@@ -138,6 +138,13 @@ runs <- merge(runs, judas.dead, all.x=T, on=c("Date", "Year", "Month", "Region")
 runs <- merge(runs, opp.shoot.days, all=TRUE, on=c("Date", "Year", "Month", "Region"))
 
 runs <- runs[Year < 2018,]
+survey.freq <- runs[, .N, by=c("Year", "Month", "Region")]
+survey.freq[, visit := 1]
+ggplot(survey.freq, aes(Month, N)) + geom_histogram(stat = "identity") +
+  theme_classic() + ylab("Number of visits") +
+  facet_grid(Year~Region) + scale_x_continuous(breaks = 1:12) 
+
+ggsave(file.path(data.path, "survey.month.year.pdf"))
 
 # Replace NA 
 replace.na <- function(DT, col_names) {
