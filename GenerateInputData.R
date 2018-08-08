@@ -141,7 +141,7 @@ judas.cleaned.sub <- judas.cleaned[(Region == "KIMBERLEY" &
                                            (Year >= 2007 & Year <= 2010))), ]
 
 cleanded.sub.ids <- judas.cleaned.sub[, unique(JUDAS_ID)]
-judas.Dist <- judas.Dist[ID.1 %in% cleanded.sub.ids | ID.2 %in% cleanded.sub.ids,]
+judas.Dist <- judas.Dist[ID.1 %in% cleanded.sub.ids & ID.2 %in% cleanded.sub.ids,]
 
 # Prepare columns
 # event is 0 when there is no encounter, and 1 when there is
