@@ -79,6 +79,9 @@ sum(t)
 sum(d)
 dim(y)
 
+t2 <- apply(y, 1, is.na)
+t3 <- apply(!t2, 2, sum)
+ggplot(as.data.frame(table(t3)), aes(t3, Freq)) + geom_histogram(stat = "identity", breaks = 1:60)
 
 data.PB <- list(y=y, N1=N1, M=M, id1=id1, time=time, distance=distance)
 sapply(data.PB, class)
@@ -163,6 +166,10 @@ t <- apply(y, 1, sum, na.rm=TRUE)
 sum(t)
 sum(d)
 dim(y)
+
+t2 <- apply(y, 1, is.na)
+t3 <- apply(!t2, 2, sum)
+ggplot(as.data.frame(table(t3)), aes(t3, Freq)) + geom_histogram(stat = "identity", breaks = 1:60)
 
 data.KM <- list(y=y, N1=N1, M=M, id1=id1, time=time, distance=distance)
 
