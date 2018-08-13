@@ -52,7 +52,7 @@ npairs.PB <- nrow(judas.Dist.Bal.PB)
 # Number of all retained observation of each judas
 N2.PB <- nrow(judas.cleaned.PB)
 JUDAS_ID.PB <- judas.Dist.Bal.PB[, unique(ID.1)] 
-judas_id_cleaned.PB <- judas.cleaned.PB[, unique()]
+judas_id_cleaned.PB <- judas.cleaned.PB[, unique(JUDAS_ID)]
 
 # y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
 # N1 is the number of observations (pairs); 
