@@ -188,13 +188,13 @@ inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1,
 params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","rho.b", "b1","b2")
 
 
-ni <- 200000
-nb <- 100000
+ni <- 200
+nb <- 100
 nthin <- 10
-nc <- 3
+nc <- 1
 np <- 8 # Number of CPUs
 fit1.KM = jags(data.KM, inits, params,  model.file="./Models/SurvDist.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=5000, 
+               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt=5000, 
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
@@ -303,7 +303,7 @@ mu.b2.backtrans <- 1-exp(-exp(fit1$mean$mu.b2))
 
 #### Bivariate HR model ####
 
-# Fit to PB data
+#### Fit to PB data ####
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
@@ -341,7 +341,7 @@ save(fit2.PB, file = file.path(analysis.path, "fit2.PB.rda"))
 load(file.path(analysis.path, "fit2.PB.rda"))
 #------------------------------------------------------------------------------#
 
-# Fit to KM data
+#### Fit to KM data ####
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
@@ -388,7 +388,7 @@ save(fit2.KM, file = file.path(analysis.path, "fit2.KM.rda"))
 load(file.path(analysis.path, "fit2.KM.rda"))
 #------------------------------------------------------------------------------#
 
-# Fit to whole dataset
+#### Fit to whole dataset ####
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
