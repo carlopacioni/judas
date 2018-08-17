@@ -7,9 +7,9 @@
     for(j in 1:M) {
 #     tau[j,1:2,1:2]<- inverse(Sigma[j,,])
      Sigma[j,1,1]<- pow(sigmax[j],2)
-     sigmax[j] ~ dunif(0,100)
+     sigmax[j] ~ dt(0,1, 4) T(0,)
      Sigma[j,2,2]<- pow(sigmay[j],2)
-     sigmay[j] ~ dunif(0,100)
+     sigmay[j] ~ dt(0,1, 4) T(0,)
      Sigma[j,1,2]<- rho[j]*sigmax[j]*sigmay[j]
      Sigma[j,2,1]<- Sigma[j,1,2]
      rho[j] ~ dunif(-1,1)
