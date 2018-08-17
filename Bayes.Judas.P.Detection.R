@@ -1,6 +1,7 @@
 library(data.table)
 library(ggplot2)
 library(jagsUI)
+library(dplyr)
 
 #### Helper functions ####
 
@@ -88,20 +89,19 @@ hist(data.PB$time)
 # b1.init <- rnorm(length(JUDAS_ID.PB), sd = 0.5)
 # b2.init <- rnorm(length(JUDAS_ID.PB), sd = 0.5)
 
-inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1, 
-                        rho.b=runif(1, -1, 1), 
-                        B.hat=cbind(rnorm(length(JUDAS_ID.PB), sd = 0.5), 
-                                    rnorm(length(JUDAS_ID.PB), sd = 0.5)))}
+inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1) 
+                        }
 
-params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","rho.b", "b1","b2")
+params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","b1","b2")
 
 ni <- 20000
 nb <- 10000
-nthin <- 10
+nthin <- 1
 nc <- 3
 np <- 8 # Number of CPUs
-fit1.PB = jags(data.PB, inits, params,  model.file="./Models/SurvDist.txt", 
-                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=2000, 
+
+fit1.PB = jags(data.PB, inits, params,  model.file="./Models/SurvDist2.txt", 
+                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
                 parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
@@ -173,21 +173,18 @@ apply(y, 1, class)
 # b1.init <- rnorm(length(JUDAS_ID.KM), sd = 0.5)
 # b2.init <- rnorm(length(JUDAS_ID.KM), sd = 0.5)
 
-inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1, 
-                         rho.b=runif(1, -1, 1), 
-                         B.hat=cbind(rnorm(length(JUDAS_ID.KM), sd = 0.5), 
-                                     rnorm(length(JUDAS_ID.KM), sd = 0.5)))}
+inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1)}
 
-params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","rho.b", "b1","b2")
+params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2", "b1","b2")
 
 
-ni <- 200000
-nb <- 100000
-nthin <- 10
+ni <- 20000
+nb <- 10000
+nthin <- 1
 nc <- 3
 np <- 8 # Number of CPUs
-fit1.KM = jags(data.KM, inits, params,  model.file="./Models/SurvDist.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=5000, 
+fit1.KM = jags(data.KM, inits, params,  model.file="./Models/SurvDist2.txt", 
+               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
@@ -301,25 +298,31 @@ mu.b2.backtrans <- 1-exp(-exp(fit1$mean$mu.b2))
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
 # id2 is the index of individuals of the retained observation of judas
-n <- length(judas.cleaned.PB[, unique(JUDAS_ID)])
-data <- list(N2=N2.PB, M=n, mean=c(0,0), 
-             id2=judas.cleaned.PB[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
-            dev=as.matrix(judas.cleaned.PB[, .(xdev, ydev)]))
+# Number of all retained observation of each judas
+nobs<- judas.cleaned.PB %>% group_by(JUDAS_ID) %>% summarise(n=n())
+nobs<- filter(nobs, n>=10)
+judas.tmp.PB<- filter(judas.cleaned.PB, JUDAS_ID %in% nobs$JUDAS_ID)
+judas.tmp.PB<- data.table(judas.tmp.PB)
 
-inits <- function(){list(sigmax=runif(n, 0.1, 10), 
-                         sigmay=runif(n, 0.1, 10), 
-                         rho=runif(n, -1, 1))}
+n <- length(judas.tmp.PB[, unique(JUDAS_ID)])
+data <- list(N2=nrow(judas.tmp.PB), M=n, mean=c(0,0), 
+             id2=judas.tmp.PB[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
+            dev=as.matrix(judas.tmp.PB[, .(xdev, ydev)]))
 
-params<- c("sigmax","sigmay","rho")
+inits <- function(){list(mu.sigmax=0,rho=runif(n,-1,1),
+                         mu.sigmay=0,mu.rho=0,sigx=1,sigy=1,
+                         sig.rho=1)}
+
+params<- c("mu.sigmax","mu.sigmay","mu.rho","sigx","sigy","sig.rho","rho","sigmax","sigmay")
 
 # fit model to data using WinBUGS code
-ni <- 20000
+ni <- 2000
 nb <- 1000
 nthin <- 1
 nc <- 3
 np <- 8 # Number of CPUs
-fit2.PB = jags(data, inits, params,  model.file="./Models/HRmodel.txt", 
-            n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt = 2000, 
+fit2.PB = jags(data, inits, params,  model.file="./Models/HRmodel2.txt", 
+            n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
             parallel=ifelse(nc>1, TRUE, FALSE), 
             n.cores=ifelse(floor(nc/np) < np, nc, np))
 
@@ -341,32 +344,30 @@ load(file.path(analysis.path, "fit2.PB.rda"))
 # id2 is the index of individuals of the retained observation of judas
 
 # Number of all retained observation of each judas
-N2.KM <- nrow(judas.cleaned.KM)
+nobs<- judas.cleaned.KM %>% group_by(JUDAS_ID) %>% summarise(n=n())
+nobs<- filter(nobs, n>=10)
+judas.tmp.KM<- filter(judas.cleaned.KM, JUDAS_ID %in% nobs$JUDAS_ID)
+judas.tmp.KM<- data.table(judas.tmp.KM)
 
-n <- length(judas.cleaned.KM[, unique(JUDAS_ID)])
-data <- list(N2=N2.KM, M=n, mean=c(0,0), 
-             id2=judas.cleaned.KM[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
-             dev=as.matrix(judas.cleaned.KM[, .(xdev, ydev)]))
+n <- length(judas.tmp.KM[, unique(JUDAS_ID)])
+data <- list(N2=nrow(judas.tmp.KM), M=n, mean=c(0,0), 
+             id2=judas.tmp.KM[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
+             dev=as.matrix(judas.tmp.KM[, .(xdev, ydev)]))
 
-inits <- function(){list(sigmax=runif(n, 0.1, 10), 
-                         sigmay=runif(n, 0.1, 10), 
-                         rho=runif(n, -1, 1))}
+inits <- function(){list(mu.sigmax=0,
+                         mu.sigmay=0,mu.rho=0,sigx=1,sigy=1,
+                         sig.rho=1)}
 
-params<- c("sigmax","sigmay","rho")
+params<- c("mu.sigmax","mu.sigmay","mu.rho","sigx","sigy","sig.rho","rho","sigmax","sigmay")
 
 # fit model to data using WinBUGS code
-ni <- 20000
+ni <- 2000
 nb <- 1000
 nthin <- 1
-nc <- 1
+nc <- 3
 np <- 8 # Number of CPUs
-fit2.KM = jags(data, inits, params,  model.file="./Models/HRmodel.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
-               parallel=ifelse(nc>1, TRUE, FALSE), 
-               n.cores=ifelse(floor(nc/np) < np, nc, np))
-
-fit2.KM = jags(data, inits, params,  model.file="./Models/HRmodel.vcov.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
+fit2.KM = jags(data, inits, params,  model.file="./Models/HRmodel2.txt", 
+               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
