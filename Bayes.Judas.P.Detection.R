@@ -188,13 +188,13 @@ inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1,
 params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","rho.b", "b1","b2")
 
 
-ni <- 200
-nb <- 100
-nthin <- 10
-nc <- 1
+ni <- 2000000
+nb <- 100000
+nthin <- 100
+nc <- 3
 np <- 8 # Number of CPUs
 fit1.KM = jags(data.KM, inits, params,  model.file="./Models/SurvDist.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt=5000, 
+               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=100000, 
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
@@ -357,7 +357,7 @@ data <- list(N2=N2.KM, M=n, mean=c(0,0),
 
 inits <- function(){list(sigmax=runif(n, 0.1, 10), 
                          sigmay=runif(n, 0.1, 10), 
-                         rho=runif(n, -1, 1))}
+                         rho=runif(n, -0.25, 0.25))}
 
 params<- c("sigmax","sigmay","rho")
 
