@@ -155,7 +155,7 @@ cat('
 #---------------------------------------------------
 # Simulate yearly removal data
 
-sim<- sim.remove2(5000, 20, log.phi = -4, lam=1.2, lam.sigma=0.05)
+sim<- sim.remove2(10000, 20, log.phi = -4, lam=1.2, lam.sigma=0.05)
 
 nrem<- as.vector(sim$rem[-1])
 eff<- as.vector(sim$eff[-1])
@@ -172,7 +172,6 @@ data = list(K=K, n=nrem, eff=eff)
 params = c("alpha","roi","N0","N")
 
 inits = function() {
-  #list(a=rnorm(5,0,1), b=rnorm(5,0,1),u=10, prior.p= runif(1),log.eta=10)
   list(alpha= -5, phi=runif(1,0,15), pop=round(nrem/0.2))
 }
 
@@ -197,3 +196,5 @@ print(fit, digits=3)
 win.graph(8,8)
 plot(sim$pop,c(fit$mean$N0, fit$mean$N))
 abline(a=0,b=1)
+
+

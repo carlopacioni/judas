@@ -61,7 +61,7 @@ sim.remove2<- function(N.init, nyears, lam=1.2, lam.sigma=0.05, log.phi=-5) {
   ROI<- c(1, rep(NA, nyears))
   n<- nyears+1
   for(i in 2:n) {
-    eff[i]<- rnorm(1, 25, 2)
+    eff[i]<- rnorm(1, 25, 5)
     p<- 1-exp(-exp(log.phi + log(eff[i])))  # Poisson model
     rem[i]<- rbinom(1, pop[i-1], p)
     lam.hat<- rnorm(1, lam, lam.sigma)
