@@ -28,7 +28,6 @@ compute.hJudas <- function (fit, M) {
 
 
 data.path <- "../Data/"
-load(file = file.path(data.path, "judas.cleaned.sub.rda"))
 load(file = file.path(data.path, "judas.Dist.Bal.rda"))
 
 #### Judas association probability - Discrete survival analysis ####
@@ -40,32 +39,26 @@ ggplot(judas.Dist.Bal, aes(Dist)) + geom_density() + xlim(c(0, 100))
 hist(judas.Dist.Bal[, time])
 
 #### Fit model to PILBARA donkeys ####
-judas.cleaned.PB <- judas.cleaned.sub[Region == "PILBARA",]
 judas.Dist.Bal.PB <- judas.Dist.Bal[Region.1 == "PILBARA",]
 judas.Dist.Bal.PB[event == 1, summary(Dist)]
 judas.Dist.Bal.PB[event == 0, summary(Dist)]  
 hist(judas.Dist.Bal.PB[, time])
 
-# Number of all possible judas pairs concurrently deployed 
-npairs.PB <- nrow(judas.Dist.Bal.PB)
 
-# Number of all retained observation of each judas
-N2.PB <- nrow(judas.cleaned.PB)
-JUDAS_ID.PB <- judas.Dist.Bal.PB[, unique(ID.1)] 
-judas_id_cleaned.PB <- judas.cleaned.PB[, unique(JUDAS_ID)]
-
-# y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
-# N1 is the number of observations (pairs); 
+# N1 is the number of observations (pairs); Number of all possible judas pairs concurrently deployed 
+N1 <- nrow(judas.Dist.Bal.PB)
 # M is the number of individuals
-# time is in (integer) months
-
-N1 <- npairs.PB
-M <- length(JUDAS_ID.PB)
+M <- length(judas.Dist.Bal.PB[, unique(ID.1)])
+# id1 is the index for Judas IDs
 id1 <- judas.Dist.Bal.PB[, as.numeric(unclass(as.factor(ID.1)))]
+# time is in (integer) 2-month periods
 time <- judas.Dist.Bal.PB[, floor(time / (30.4 * 2)) + 1]
+# d is the event vector with 1 when encounter occurs
 d <- judas.Dist.Bal.PB[, event]
+# distance between HR centres
 distance <- judas.Dist.Bal.PB[, Dist]
 
+# y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
 y <- matrix(rep(NA, N1 * max(time)), nrow=N1)
 for (i in 1:N1) {
   y[i, time[i]] <- d[i]   
@@ -130,28 +123,21 @@ mu.b2.PB.backtrans <- 1-exp(-exp(fit1.PB$mean$mu.b2))
 #------------------------------------------------------------------------------#
 
 #### Fit model to KM donkeys ####
-judas.cleaned.KM <- judas.cleaned.sub[Region == "KIMBERLEY",]
 judas.Dist.Bal.KM <- judas.Dist.Bal[Region.1 == "KIMBERLEY",]
 judas.Dist.Bal.KM[event == 1, summary(Dist)]
 judas.Dist.Bal.KM[event == 0, summary(Dist)]  
-# judas.Dist.Bal.KM <- judas.Dist.Bal.KM[Dist < 50,]
 
-# Number of all possible judas pairs concurrently deployed 
-npairs.KM <- nrow(judas.Dist.Bal.KM)
-
-# Number judas
-JUDAS_ID.KM <- judas.Dist.Bal.KM[, unique(ID.1)] 
-
-# y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
-# N1 is the number of observations (pairs); M is the number of individuals
-# time is in (integer) months
-N1 <- npairs.KM
-M <- length(JUDAS_ID.KM)
+# N1 is the number of observations (pairs); Number of all possible judas pairs concurrently deployed 
+N1 <- nrow(judas.Dist.Bal.KM)
+# M is the number of individuals
+M <- length(judas.Dist.Bal.KM[, unique(ID.1)])
 id1 <- judas.Dist.Bal.KM[, as.numeric(unclass(as.factor(ID.1)))]
+# time is in (integer) 2-month periods
 time <- judas.Dist.Bal.KM[, floor(time / (30.4 * 2)) + 1]
 d <- judas.Dist.Bal.KM[, event]
 distance <- judas.Dist.Bal.KM[, Dist]
 
+# y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
 y <- matrix(rep(NA, N1 * max(time)), nrow=N1)
 for (i in 1:N1) {
   y[i, time[i]] <- d[i]   
@@ -173,7 +159,6 @@ data.KM <- list(y=y, N1=N1, M=M, id1=id1, time=time, distance=distance)
 
 sapply(data.KM, class)
 hist(data.KM$time)
-apply(y, 1, class)
 
 # b1.init <- rnorm(length(JUDAS_ID.KM), sd = 0.5)
 # b2.init <- rnorm(length(JUDAS_ID.KM), sd = 0.5)
@@ -216,19 +201,19 @@ mu.b2.KM.backtrans <- 1-exp(-exp(fit1.KM$mean$mu.b2))
 #------------------------------------------------------------------------------#
 
 #### Fit model to whole dataset ####
-
-# Number of all possible judas pairs concurrently deployed 
-npairs <- nrow(judas.Dist.Bal)
-
-# Number of all retained observation of each judas
-N2 <- nrow(judas.cleaned.sub)
-JUDAS_ID <- judas.Dist.Bal[, unique(ID.1)] 
+#############################################################################
+#### Need to edit with Dist2 model 
+####################
+############
+##########
+######
 
 # y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
-# N1 is the number of observations (pairs); M is the number of individuals
+# N1 is the number of observations (pairs); 
+# M is the number of individuals
 # time is in (integer) months
-N1 <- npairs
-M <- length(JUDAS_ID)
+N1 <- nrow(judas.Dist.Bal)
+M <- length(judas.Dist.Bal[, unique(ID.1)])
 id1 <- judas.Dist.Bal[, as.numeric(unclass(as.factor(ID.1)))]
 time <- judas.Dist.Bal[, floor(time / (30.4 * 2)) + 1]
 d <- judas.Dist.Bal[, event]
@@ -254,21 +239,17 @@ sapply(data, class)
 # b1.init <- rnorm(length(JUDAS_ID), sd = 0.5)
 # b2.init <- rnorm(length(JUDAS_ID), sd = 0.5)
 
-inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1, 
-                         rho.b=runif(1, -1, 1), 
-                         B.hat=cbind(rnorm(length(JUDAS_ID), sd = 0.5), 
-                                     rnorm(length(JUDAS_ID), sd = 0.5)))}
+inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1)}
 
-params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","rho.b", "b1","b2")
-
+params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2", "b1","b2")
 
 ni <- 20000
 nb <- 10000
 nthin <- 10
 nc <- 3
 np <- 8 # Number of CPUs
-fit1 = jags(data, inits, params,  model.file="./Models/SurvDist.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=5000, 
+fit1 = jags(data, inits, params,  model.file="./Models/SurvDist2.txt", 
+               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt=5000, 
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
@@ -297,16 +278,28 @@ mu.b2.backtrans <- 1-exp(-exp(fit1$mean$mu.b2))
 #=============================================================================#
 
 #### Bivariate HR model ####
+data.path <- "../Data/"
+load(file = file.path(data.path, "judas.cleaned.HR.rda"))
 
 #### Fit to PB data ####
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
 # id2 is the index of individuals of the retained observation of judas
-n <- length(judas.cleaned.PB[, unique(JUDAS_ID)])
+
+judas.cleaned.HR.PB <- judas.cleaned.HR[Region == "PILBARA",]
+
+# Confirm min number of observations
+nobs.PB <- judas.cleaned.HR.PB[, .N, by=JUDAS_ID]
+nobs.PB[, summary(N)]
+# setkey(judas.cleaned.HR.PB, JUDAS_ID)
+# judas.cleaned.HR.PB <- judas.cleaned.HR.PB[nobs.PB[N>=5, JUDAS_ID], ]
+
+N2.PB <- nrow(judas.cleaned.HR.PB)
+n <- length(judas.cleaned.HR.PB[, unique(JUDAS_ID)])
 data <- list(N2=N2.PB, M=n, mean=c(0,0), 
-             id2=judas.cleaned.PB[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
-            dev=as.matrix(judas.cleaned.PB[, .(xdev, ydev)]))
+             id2=judas.cleaned.HR.PB[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
+            dev=as.matrix(judas.cleaned.HR.PB[, .(xdev, ydev)]))
 
 inits <- function(){list(sigmax=runif(n, 0.1, 10), 
                          sigmay=runif(n, 0.1, 10), 
@@ -315,12 +308,12 @@ inits <- function(){list(sigmax=runif(n, 0.1, 10),
 params<- c("rho", "sigmax","sigmay")
 
 # fit model to data using WinBUGS code
-ni <- 2000
-nb <- 1000
+ni <- 20000
+nb <- 10000
 nthin <- 1
 nc <- 3
 np <- 8 # Number of CPUs
-fit2.PB = jags(data, inits, params,  model.file="./Models/HRmodel.txt", 
+fit2.PB = jags(data, inits, params,  model.file="./Models/HRmodel.vcov.txt", 
             n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
             parallel=ifelse(nc>1, TRUE, FALSE), 
             n.cores=ifelse(floor(nc/np) < np, nc, np))
@@ -337,35 +330,38 @@ load(file.path(analysis.path, "fit2.PB.rda"))
 #------------------------------------------------------------------------------#
 
 #### Fit to KM data ####
+
+judas.cleaned.HR.KM <- judas.cleaned.HR[Region == "KIMBERLEY",]
+
+# Confirm min number of observations
+nobs.KM <- judas.cleaned.HR.KM[, .N, by=JUDAS_ID]
+nobs.KM[, summary(N)]
+# setkey(judas.cleaned.HR.KM, JUDAS_ID)
+# judas.cleaned.HR.KM <- judas.cleaned.HR.KM[nobs.KM[N>=5, JUDAS_ID], ]
+
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
 # id2 is the index of individuals of the retained observation of judas
 
 # Number of all retained observation of each judas
-N2.KM <- nrow(judas.cleaned.KM)
-
-nobs<- judas.cleaned.KM %>% group_by(JUDAS_ID) %>% summarise(n=n())
-nobs<- filter(nobs, n>=10)
-judas.tmp.KM<- filter(judas.cleaned.KM, JUDAS_ID %in% nobs$JUDAS_ID)
-judas.tmp.KM<- data.table(judas.tmp.KM)
-
-n <- length(judas.tmp.KM[, unique(JUDAS_ID)])
+N2.KM <- nrow(judas.cleaned.HR.KM)
+n <- length(judas.cleaned.HR.KM[, unique(JUDAS_ID)])
 data <- list(N2=N2.KM, M=n, mean=c(0,0), 
-             id2=judas.tmp.KM[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
-             dev=as.matrix(judas.tmp.KM[, .(xdev, ydev)]))
+             id2=judas.cleaned.HR.KM[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
+             dev=as.matrix(judas.cleaned.HR.KM[, .(xdev, ydev)]))
 
 inits <- function(){list(sigmax=runif(n, 0.1, 10), 
                          sigmay=runif(n, 0.1, 10), 
-                         rho=runif(n, -0.25, 0.25))}
+                         rho=runif(n, -1, 1))}
 
 params<- c("sigmax","sigmay","rho")
 
 # fit model to data using WinBUGS code
-ni <- 2000
-nb <- 1000
+ni <- 20000
+nb <- 10000
 nthin <- 1
-nc <- 1
+nc <- 3
 np <- 8 # Number of CPUs
 fit2.KM = jags(data, inits, params,  model.file="./Models/HRmodel.vcov.txt", 
                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
@@ -390,12 +386,12 @@ load(file.path(analysis.path, "fit2.KM.rda"))
 # id2 is the index of individuals of the retained observation of judas
 
 # Number of all retained observation of each judas
-N2 <- nrow(judas.cleaned.sub)
+N2 <- nrow(judas.cleaned.HR)
 
-n <- length(judas.cleaned.sub[, unique(JUDAS_ID)])
+n <- length(judas.cleaned.HR[, unique(JUDAS_ID)])
 data <- list(N2=N2, M=n, mean=c(0,0), 
-             id2=judas.cleaned.sub[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
-             dev=as.matrix(judas.cleaned.sub[, .(xdev, ydev)]))
+             id2=judas.cleaned.HR[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
+             dev=as.matrix(judas.cleaned.HR[, .(xdev, ydev)]))
 
 inits <- function(){list(sigmax=runif(n, 0.1, 10), 
                          sigmay=runif(n, 0.1, 10), 
