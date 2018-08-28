@@ -76,10 +76,10 @@ judas.cleaned.HR <- judas.cleaned[JUDAS_ID %in% judas.cleaned.surv[, unique(JUDA
 judas.cleaned.HR[, ':='(HRlat=mean(Latitude), HRlong=mean(Longitude)), by=JUDAS_ID]
 
 # Calculate deviations from HRcentres 
-judas.cleaned.HR[, xdev:=calc.latlong.dist(judas.cleaned.HR[, .(Latitude, HRlong)],
+judas.cleaned.HR[, xdev:=calc.latlong.dist(judas.cleaned.HR[, .(HRlat, Longitude)],
                                         judas.cleaned.HR[, .(HRlat, HRlong)])]
-judas.cleaned.HR[, ydev:=calc.latlong.dist(judas.cleaned.HR[, .(HRlat, Longitude)],
-                                        judas.cleaned.HR[, .(HRlat, HRlong)])]
+judas.cleaned.HR[, ydev:=calc.latlong.dist(judas.cleaned.HR[, .(Latitude, HRlong)],
+                                           judas.cleaned.HR[, .(HRlat, HRlong)])]
 judas.cleaned.HR[, summary(xdev)]
 judas.cleaned.HR[, summary(ydev)]
 
