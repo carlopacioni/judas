@@ -72,6 +72,20 @@ judas.cleaned.surv <- judas.cleaned.surv[!JUDAS_ID %in%
     # location outside the year interval selected for survival analysis
 judas.cleaned.HR <- judas.cleaned[JUDAS_ID %in% judas.cleaned.surv[, unique(JUDAS_ID)],]
 
+# Check whether there are judas with < minloc data points and rm
+locs <- judas.cleaned.HR[, .N, by=JUDAS_ID]
+minloc <- 5
+locs[, sum(N < minloc)]
+judas.cleaned.HR <- judas.cleaned.HR[!JUDAS_ID %in% locs[N < minloc, JUDAS_ID], ]
+
+# Jitter coordinates (by ~ 5 km) when there are multiple entries with same coordinates
+judas.cleaned.HR<-judas.cleaned.HR[
+  duplicated(judas.cleaned.HR[, round(Latitude, digits=5)], by="Latitude"), 
+  Latitude:=jitter(Latitude, amount = 0.045), by=JUDAS_ID]
+judas.cleaned.HR<-judas.cleaned.HR[
+  duplicated(judas.cleaned.HR[, round(Longitude, digits=5)], by="Longitude"), 
+  Longitude:=jitter(Longitude, amount = 0.045), by=JUDAS_ID]
+
 # Home Range centres
 judas.cleaned.HR[, ':='(HRlat=mean(Latitude), HRlong=mean(Longitude)), by=JUDAS_ID]
 
@@ -86,20 +100,17 @@ judas.cleaned.HR[, summary(ydev)]
 ggplot(judas.cleaned.HR) + geom_density(aes(xdev), col="blue") + 
   geom_density(aes(ydev), col="red") + xlim(c(0, 60))
 
-# rm animals that didn't move (hence possibly wrong coords)
-dev.checks <- judas.cleaned.HR[, .(sumxdev=sum(xdev), sumydev=sum(ydev)), by=JUDAS_ID]
-dev.checks[sumxdev == 0 | sumydev == 0,]
-setkey(judas.cleaned.HR, JUDAS_ID)
-judas.cleaned.HR <- judas.cleaned.HR[dev.checks[sumxdev > 0 & sumydev > 0, JUDAS_ID], ]
+chk <- judas.cleaned.HR[, .(Meanx=mean(xdev), SDx=sd(xdev),
+                               Meany=mean(ydev), SDy=sd(ydev)), by=JUDAS_ID]
 
-# Check whether there are judas with < minloc data points and rm
-locs <- judas.cleaned.HR[, .N, by=JUDAS_ID]
-minloc <- 10
-locs[, sum(N < minloc)]
-judas.cleaned.HR <- judas.cleaned.HR[!JUDAS_ID %in% locs[N < minloc, JUDAS_ID], ]
+ggplot(chk, aes(Meanx, Meany)) + geom_point()
+ggplot(chk, aes(SDx, SDy)) + geom_point() 
 
-judas.cleaned.HR[, summary(xdev)]
-judas.cleaned.HR[, summary(ydev)]
+ggplot(chk, aes(SDx, SDy)) + geom_point() + xlim(c(0,5)) + ylim(c(0,5))
+
+chk[, quantile(SDx, probs = seq(0.8, 1, by = 0.02))]
+chk[, quantile(SDy, probs = seq(0.8, 1, by = 0.02))]
+chk[, quantile(c(SDx, SDy), probs = seq(0.8, 1, by = 0.02))]
 
 ggplot(judas.cleaned.HR) + geom_density(aes(xdev), col="blue") + 
   geom_density(aes(ydev), col="red") + xlim(c(0, 60))
@@ -236,6 +247,7 @@ for(rn in seq_len(rns)) {
 judas.Dist[event == 1, summary(Dist)]
 ggplot(judas.Dist[event == 1, ], aes(Dist)) + geom_density() + xlim(c(0, 100))
 
+# Apply a cut off beyond max Dist where encounter occurs
 max.Dist <- judas.Dist[event == 1, max(Dist)]
 judas.Dist.Bal <- judas.Dist[Dist <= max.Dist,]
 judas.Dist.Bal[, Rn:=seq_len(nrow(judas.Dist[Dist <= max.Dist,]))]
@@ -324,6 +336,7 @@ judas.Dist.Bal[, length(unique(ID.1))]
 
 write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
 save(judas.Dist, file = file.path(data.path, "judas.Dist.rda"))
+save(judas.cleaned, file = file.path(data.path, "judas.cleaned.rda"))
 save(judas.cleaned.surv, file = file.path(data.path, "judas.cleaned.surv.rda"))
 save(judas.cleaned.HR, file = file.path(data.path, "judas.cleaned.HR.rda"))
 # Note that data regarding ID.1 and ID.2 may be swapped now
