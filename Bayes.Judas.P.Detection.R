@@ -88,38 +88,74 @@ inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1)}
 
 params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2", "b1","b2")
 
-ni <- 20000
+ni <- 40000
 nb <- 10000
 nthin <- 1
-nc <- 3
+nc <- 4
 np <- 8 # Number of CPUs
 
-fit1.PB = jags(data.PB, inits, params,  model.file="./Models/SurvDist2.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=2000, 
+fit1.PB2 = jags(data.PB, inits, params,  model.file="./Models/SurvDist2.txt", 
+               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt=2000, 
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
+
+summary(fit1.PB2)
+print(fit1.PB2,digits=3) 
+sapply(fit1.PB2$n.eff, summary)
+sapply(fit1.PB2$Rhat, summary)
+plot(fit1.PB2)
+fit1.PB2$mean[1:4]
+
+hist(fit1.PB2$mean$b1)
+hist(fit1.PB2$mean$b2)
+summary(fit1.PB2$mean$b2)
+
+ggplot(data.frame(b1=fit1.PB2$mean$b1, b2=fit1.PB2$mean$b2), aes(b1, b2)) +
+  geom_point() + geom_smooth()
+
+################################################################################
+inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1, 
+                         rho.b=runif(1, -1, 1), 
+                         B.hat=cbind(rnorm(length(judas.Dist.Bal.PB[, unique(ID.1)]), sd = 0.5), 
+                                     rnorm(length(judas.Dist.Bal.PB[, unique(ID.1)]), sd = 0.5)))}
+
+params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","rho.b", "b1","b2")
+
+fit1.PB = jags(data.PB, inits, params,  model.file="./Models/SurvDist.txt", 
+                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=2000, 
+                parallel=ifelse(nc>1, TRUE, FALSE), 
+                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
 summary(fit1.PB)
 print(fit1.PB,digits=3) 
 sapply(fit1.PB$n.eff, summary)
 sapply(fit1.PB$Rhat, summary)
 plot(fit1.PB)
+fit1.PB$mean[1:5]
 
-# fit1.PB$sims.list
+analysis.path <- "../Data/Analysis"
+save(fit1.PB2, file = file.path(analysis.path, "fit1.PB2.rda"))
+
+ggplot(data.frame(b1=fit1.PB$mean$b1, b2=fit1.PB$mean$b2), aes(b1, b2)) +
+  geom_point() + geom_smooth(method = "lm")
 
 analysis.path <- "../Data/Analysis"
 save(fit1.PB, file = file.path(analysis.path, "fit1.PB.rda"))
-load(file = file.path(analysis.path, "fit1.PB.rda"))
+################################################################################
+
+# fit1.PB$sims.list
+
+load(file = file.path(analysis.path, "fit1.PB2.rda"))
 
 # Prob profile
 hDist <- mapply(compute.hDist, b1=fit1.PB$mean$b1, b2=fit1.PB$mean$b2, 
-             Dist=seq(0, 50, length.out=length(fit1.PB$mean$b1)))
+             Dist=seq(0, 50, length.out=length(fit1.PB2$mean$b1)))
 
-pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.PB$mean$b1)))
+pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.PB2$mean$b1)))
 ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
 
-mu.b1.PB.backtrans <- 1-exp(-exp(fit1.PB$mean$mu.b1))
-mu.b2.PB.backtrans <- 1-exp(-exp(fit1.PB$mean$mu.b2))
+mu.b1.PB.backtrans <- 1-exp(-exp(fit1.PB2$mean$mu.b1))
+mu.b2.PB.backtrans <- 1-exp(-exp(fit1.PB2$mean$mu.b2))
 #------------------------------------------------------------------------------#
 
 #### Fit model to KM donkeys ####
@@ -168,36 +204,61 @@ inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1)}
 params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2", "b1","b2")
 
 
-ni <- 20000
+ni <- 400000
 nb <- 10000
-nthin <- 1
-nc <- 3
+nthin <- 10
+nc <- 4
 np <- 8 # Number of CPUs
-fit1.KM = jags(data.KM, inits, params,  model.file="./Models/SurvDist2.txt", 
+fit1.KM2 = jags(data.KM, inits, params,  model.file="./Models/SurvDist2.txt", 
                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt=100000, 
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
-summary(fit1.KM)
-print(fit1.KM,digits=3) 
-sapply(fit1.KM$n.eff, summary)
-sapply(fit1.KM$Rhat, summary)
-plot(fit1.KM)
+summary(fit1.KM2)
+print(fit1.KM2,digits=3) 
+sapply(fit1.KM2$n.eff, summary)
+sapply(fit1.KM2$Rhat, summary)
+plot(fit1.KM2)
+fit1.KM2$mean[1:4]
+
+ggplot(data.frame(b1=fit1.KM2$mean$b1, b2=fit1.KM2$mean$b2), aes(b1, b2)) +
+  geom_point() + geom_smooth()
+
+hist(fit1.KM2$mean$b1)
+hist(fit1.KM2$mean$b2)
+summary(fit1.KM2$mean$b2)
+
+analysis.path <- "../Data/Analysis"
+save(fit1.KM2, file = file.path(analysis.path, "fit1.KM2.rda"))
+
+################################################################################
+inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1, 
+                         rho.b=runif(1, -1, 1), 
+                         B.hat=cbind(rnorm(length(judas.Dist.Bal.KM[, unique(ID.1)]), sd = 0.5), 
+                                     rnorm(length(judas.Dist.Bal.KM[, unique(ID.1)]), sd = 0.5)))}
+
+params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","rho.b", "b1","b2")
+
+fit1.KM = jags(data.KM, inits, params,  model.file="./Models/SurvDist.txt", 
+               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=1000, 
+               parallel=ifelse(nc>1, TRUE, FALSE), 
+               n.cores=ifelse(floor(nc/np) < np, nc, np))
 
 # fit1.KM$sims.list
 
 analysis.path <- "../Data/Analysis"
 save(fit1.KM, file = file.path(analysis.path, "fit1.KM.rda"))
+################################################################################
 
 # Prob profile
-hDist <- mapply(compute.hDist, b1=fit1.KM$mean$b1, b2=fit1.KM$mean$b2, 
-                Dist=seq(0, 50, length.out=length(fit1.KM$mean$b1)))
+hDist <- mapply(compute.hDist, b1=fit1.KM2$mean$b1, b2=fit1.KM2$mean$b2, 
+                Dist=seq(0, 50, length.out=length(fit1.KM2$mean$b1)))
 
-pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.KM$mean$b1)))
+pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.KM2$mean$b1)))
 ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
 
-mu.b1.KM.backtrans <- 1-exp(-exp(fit1.KM$mean$mu.b1))
-mu.b2.KM.backtrans <- 1-exp(-exp(fit1.KM$mean$mu.b2))
+mu.b1.KM.backtrans <- 1-exp(-exp(fit1.KM2$mean$mu.b1))
+mu.b2.KM.backtrans <- 1-exp(-exp(fit1.KM2$mean$mu.b2))
 #------------------------------------------------------------------------------#
 
 #### Fit model to whole dataset ####
@@ -243,10 +304,10 @@ inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1)}
 
 params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2", "b1","b2")
 
-ni <- 20000
+ni <- 400000
 nb <- 10000
 nthin <- 10
-nc <- 3
+nc <- 4
 np <- 8 # Number of CPUs
 fit1 = jags(data, inits, params,  model.file="./Models/SurvDist2.txt", 
                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt=5000, 
@@ -273,7 +334,6 @@ ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
 
 mu.b1.backtrans <- 1-exp(-exp(fit1$mean$mu.b1))
 mu.b2.backtrans <- 1-exp(-exp(fit1$mean$mu.b2))
-
 
 #=============================================================================#
 
@@ -313,7 +373,7 @@ nb <- 10000
 nthin <- 1
 nc <- 3
 np <- 8 # Number of CPUs
-fit2.PB = jags(data, inits, params,  model.file="./Models/HRmodel.vcov.txt", 
+fit2.PB <- jags(data, inits, params,  model.file="./Models/HRmodel.vcov.txt", 
             n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
             parallel=ifelse(nc>1, TRUE, FALSE), 
             n.cores=ifelse(floor(nc/np) < np, nc, np))
@@ -338,6 +398,21 @@ nobs.KM <- judas.cleaned.HR.KM[, .N, by=JUDAS_ID]
 nobs.KM[, summary(N)]
 # setkey(judas.cleaned.HR.KM, JUDAS_ID)
 # judas.cleaned.HR.KM <- judas.cleaned.HR.KM[nobs.KM[N>=5, JUDAS_ID], ]
+
+judas.cleaned.HR.KM[, summary(xdev)]
+judas.cleaned.HR.KM[, summary(ydev)]
+
+
+judas.cleaned.HR.KM[, hist(xdev)]
+judas.cleaned.HR.KM[, hist(ydev)]
+
+ggplot(judas.cleaned.HR.KM, aes(xdev, ydev)) + geom_point()
+
+chk <- judas.cleaned.HR.KM[, .(Meanx=mean(xdev), SDx=sd(xdev),
+                               Meany=mean(ydev), SDy=sd(ydev)), by=JUDAS_ID]
+
+ggplot(chk, aes(Meanx, Meany)) + geom_point()
+ggplot(chk, aes(SDx, SDy)) + geom_point() #+ xlim(c(0,5)) + ylim(c(0,5))
 
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
@@ -377,6 +452,8 @@ traceplot(fit2.KM, parameters="rho")
 traceplot(fit2.KM, parameters="sigmay")
 save(fit2.KM, file = file.path(analysis.path, "fit2.KM.rda"))
 load(file.path(analysis.path, "fit2.KM.rda"))
+
+
 #------------------------------------------------------------------------------#
 
 #### Fit to whole dataset ####
@@ -405,10 +482,6 @@ nb <- 1000
 nthin <- 1
 nc <- 1
 np <- 8 # Number of CPUs
-fit2 = jags(data, inits, params,  model.file="./Models/HRmodel.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
-               parallel=ifelse(nc>1, TRUE, FALSE), 
-               n.cores=ifelse(floor(nc/np) < np, nc, np))
 
 fit2 = jags(data, inits, params,  model.file="./Models/HRmodel.vcov.txt", 
                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
