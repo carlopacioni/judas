@@ -499,7 +499,7 @@ sapply(fit2$Rhat, summary)
 plot(fit2)
 traceplot(fit2, parameters="rho")
 traceplot(fit2, parameters="sigmay")
-save(fit2, file = file.path(analysis.path, "fit2.KM.rda"))
+save(fit2, file = file.path(analysis.path, "fit2.rda"))
 load(file.path(analysis.path, "fit2.rda"))
 #------------------------------------------------------------------------------#
 
