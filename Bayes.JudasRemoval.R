@@ -71,6 +71,45 @@ mean(fit.KM$sims.list$fit.sim > fit.KM$sims.list$fit)
 ggplot(data.frame(fit=fit.KM$sims.list$fit, fit.sim=fit.KM$sims.list$fit.sim),
        aes(fit, fit.sim)) + geom_point() + xlim(c(0, 15000)) + ylim(c(0, 15000)) +
   geom_abline(aes(slope=1, intercept=0), col="red")
+
+
+# Fit the model with fixed roi
+# Fit with fixed roi
+fit.KM.roi = jags(data, inits, params, model.file="./Models/JudasRm_multipleMethods_Fixed_roi.txt", 
+                  n.chains=nc, n.iter=ni, n.burnin=nb, 
+                  n.thin=nt, parallel=ifelse(nc>1, TRUE, FALSE), 
+                  n.cores=ifelse(floor(nc/np) < np, nc, np))
+
+print(fit.KM.roi, digits=3)
+sapply(fit.KM.roi$n.eff, summary)
+sapply(fit.KM.roi$Rhat, summary)
+
+# Plot fit
+n.est <- fit.KM.roi$mean$p * cbind(fit.KM.roi$mean$pop, fit.KM.roi$mean$pop)
+check_fit.KM.roi <- data.frame(runs_years_KM[, .(Year, Judas.culling, N_Ferals)], 
+                               judas.est=n.est[, 1], opp.est=n.est[,2])
+
+ggplot(check_fit.KM.roi) + geom_point(aes(Year, Judas.culling), col="blue", shape=16) + 
+  geom_point(aes(Year, judas.est), col="red", shape=16) +
+  geom_point(aes(Year, N_Ferals), col="blue", shape=7) +
+  geom_point(aes(Year, opp.est), col="red", shape=7) +
+  ylab("Number of animals removed")
+
+ggsave(filename=file.path(analysis.path, "Judas_Rm_Mod_fit_KM_roi.pdf"))
+
+# Mean difference and sd  of judas and opportunistic
+mean(check_fit.KM.roi$Judas.culling - check_fit.KM.roi$judas.est)
+sd(check_fit.KM.roi$Judas.culling - check_fit.KM.roi$judas.est)
+
+mean(check_fit.KM.roi$N_Ferals - check_fit.KM.roi$opp.est)
+sd(check_fit.KM.roi$N_Ferals - check_fit.KM.roi$opp.est)
+
+fit.KM.roi$mean$fit/fit.KM.roi$mean$fit.sim
+mean(fit.KM.roi$sims.list$fit.sim > fit.KM.roi$sims.list$fit)
+
+ggplot(data.frame(fit=fit.KM.roi$sims.list$fit, fit.sim=fit.KM.roi$sims.list$fit.sim),
+       aes(fit, fit.sim)) + geom_point() + xlim(c(0, 8000)) + ylim(c(0, 8000)) +
+  geom_abline(aes(slope=1, intercept=0), col="red")
 #------------------------------------------------------------------------------#
 
 #### Fit model to PB data ####
@@ -376,7 +415,8 @@ ggplot(data.frame(fit=fit.both.2a.Froi$sims.list$fit, fit.sim=fit.both.2a.Froi$s
   geom_abline(aes(slope=1, intercept=0), col="red")
 
 #------------------------------------------------------------------------------#
-save(list= c("fit.KM", "fit.PB", "fit.PB.roi", "fit.both", "fit.both.2a", "fit.both.2a.Froi"), 
+save(list= c("fit.KM", "fit.KM.roi", "fit.PB", "fit.PB.roi", "fit.both", 
+             "fit.both.2a", "fit.both.2a.Froi"), 
      file = file.path(analysis.path, "FittedMods.rda"))
 #------------------------------------------------------------------------------#
 
@@ -399,21 +439,21 @@ extr.bypop <- function(mod_fit, param, pn=1, j=1) {
   return(c(low, m, upp))
 }
 
-lmods <- list(fit.KM, fit.PB, fit.PB.roi, fit.both)
+lmods <- list(fit.KM, fit.KM.roi, fit.PB, fit.PB.roi, fit.both)
 Alphaj <- lapply(lmods, extr, "alpha")
 Alphaopp <- lapply(lmods, extr, "alpha", j=2)
 RoI <- lapply(lmods, extr, "roi")
 
 lmods.sep <- list(fit.both.2a, fit.both.2a.Froi)
 AlphajKM <- lapply(lmods.sep, extr.bypop, "alpha")
-AlphajPM <- lapply(lmods.sep, extr.bypop, "alpha", pn=2)
+AlphajPB <- lapply(lmods.sep, extr.bypop, "alpha", pn=2)
 AlphaoppKM <- lapply(lmods.sep, extr.bypop, "alpha", j=2)
 AlphaoppPB <- lapply(lmods.sep, extr.bypop, "alpha", pn=2, j=2)
 RoI.CAsep <- lapply(lmods.sep, extr, "roi")
 
 DIC <- lapply(c(lmods, lmods.sep), "[[", "DIC")
 
-Analysis <- c("KM", "PB", "PB.roi", "CA", "CA.sepKM", "CA.sepKM.roi", "CA.sepPB", "CA.sepPB.roi")
+Analysis <- c("KM", "KM.roi", "PB", "PB.roi", "CA", "CA.sepKM", "CA.sepKM.roi", "CA.sepPB", "CA.sepPB.roi")
 Params <- c("Lower.Alpha.Judas", "Mean.Alpha.Judas", "Upper.Alpha.Judas", 
             "Lower.Alpha.opp", "Mean.Alpha.opp", "Upper.Alpha.opp", 
             "Lower.RoI", "Mean.RoI", "Upper.RoI", "DIC")
@@ -422,7 +462,7 @@ comp_a_roi <- as.data.frame(rbind(
                            do.call("cbind", args=c(Alphaj, AlphajKM, AlphajPB)),
                            do.call("cbind", args=c(Alphaopp, AlphaoppKM, AlphaoppPB)),
                            do.call("cbind", args=c(RoI, RoI.CAsep, RoI.CAsep)),
-                           do.call(c, args=c(DIC, DIC[5:6]))))
+                           do.call(c, args=c(DIC, DIC[6:7]))))
 
 names(comp_a_roi) <- Analysis
 comp_a_roi <- cbind(Params, comp_a_roi)
@@ -453,7 +493,7 @@ ggplot(PB.Ns, aes(Year, log(Mean, 10), col=Analysis, shape=Analysis)) +
 ggsave(filename=file.path(analysis.path, "Popsize.est_comp_PB.pdf"))
 
 
-KM.N <- lapply(list(fit.KM), extr, "N", j=1:24)
+KM.N <- lapply(list(fit.KM, fit.KM.roi), extr, "N", j=1:24)
 KM.N <- lapply(KM.N, matrix, nrow=24)
 
 KM.N.both <- lapply(lmods.both, extr.bypop, "N", pn=1:24, j=1)
@@ -461,8 +501,8 @@ KM.N.both <- lapply(KM.N.both, matrix, nrow=24)
 
 KM.Ns <- do.call(rbind, c(KM.N, KM.N.both))
 
-KM.Ns <- data.frame(Year=rep(1994:2017, 4), 
-                    Analysis=rep(c("KM", "CA", "CA.sep", "CA.sep.roi"), each=24),
+KM.Ns <- data.frame(Year=rep(1994:2017, 5), 
+                    Analysis=rep(c("KM", "KM.roi", "CA", "CA.sep", "CA.sep.roi"), each=24),
                     KM.Ns)
 names(KM.Ns)[3:5] <- c("Lower", "Mean", "Upper")
 
