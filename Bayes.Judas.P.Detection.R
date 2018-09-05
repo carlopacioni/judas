@@ -112,6 +112,8 @@ summary(fit1.PB2$mean$b2)
 
 ggplot(data.frame(b1=fit1.PB2$mean$b1, b2=fit1.PB2$mean$b2), aes(b1, b2)) +
   geom_point() + geom_smooth()
+analysis.path <- "../Data/Analysis"
+save(fit1.PB2, file = file.path(analysis.path, "fit1.PB2.rda"))
 
 ################################################################################
 inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1, 
@@ -133,9 +135,6 @@ sapply(fit1.PB$Rhat, summary)
 plot(fit1.PB)
 fit1.PB$mean[1:5]
 
-analysis.path <- "../Data/Analysis"
-save(fit1.PB2, file = file.path(analysis.path, "fit1.PB2.rda"))
-
 ggplot(data.frame(b1=fit1.PB$mean$b1, b2=fit1.PB$mean$b2), aes(b1, b2)) +
   geom_point() + geom_smooth(method = "lm")
 
@@ -148,11 +147,13 @@ save(fit1.PB, file = file.path(analysis.path, "fit1.PB.rda"))
 load(file = file.path(analysis.path, "fit1.PB2.rda"))
 
 # Prob profile
-hDist <- mapply(compute.hDist, b1=fit1.PB$mean$b1, b2=fit1.PB$mean$b2, 
+hDist <- mapply(compute.hDist, b1=fit1.PB2$mean$b1, b2=fit1.PB2$mean$b2, 
              Dist=seq(0, 50, length.out=length(fit1.PB2$mean$b1)))
 
 pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.PB2$mean$b1)))
 ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
+ggsave(file.path(analysis.path, "Density.dist.Dprob_Dist.PB.pdf"))
+
 
 mu.b1.PB.backtrans <- 1-exp(-exp(fit1.PB2$mean$mu.b1))
 mu.b2.PB.backtrans <- 1-exp(-exp(fit1.PB2$mean$mu.b2))
@@ -244,7 +245,9 @@ fit1.KM = jags(data.KM, inits, params,  model.file="./Models/SurvDist.txt",
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
-# fit1.KM$sims.list
+sapply(fit1.KM$n.eff, summary)
+sapply(fit1.KM$Rhat, summary)
+fit1.KM$mean[1:5]
 
 analysis.path <- "../Data/Analysis"
 save(fit1.KM, file = file.path(analysis.path, "fit1.KM.rda"))
@@ -256,6 +259,7 @@ hDist <- mapply(compute.hDist, b1=fit1.KM2$mean$b1, b2=fit1.KM2$mean$b2,
 
 pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.KM2$mean$b1)))
 ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
+ggsave(file.path(analysis.path, "Density.dist.Dprob_Dist.KM.pdf"))
 
 mu.b1.KM.backtrans <- 1-exp(-exp(fit1.KM2$mean$mu.b1))
 mu.b2.KM.backtrans <- 1-exp(-exp(fit1.KM2$mean$mu.b2))
@@ -306,7 +310,7 @@ params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2", "b1","b2")
 
 ni <- 400000
 nb <- 10000
-nthin <- 10
+nthin <- 20
 nc <- 4
 np <- 8 # Number of CPUs
 fit1 = jags(data, inits, params,  model.file="./Models/SurvDist2.txt", 
@@ -478,9 +482,9 @@ params<- c("sigmax","sigmay","rho")
 
 # fit model to data using WinBUGS code
 ni <- 20000
-nb <- 1000
+nb <- 10000
 nthin <- 1
-nc <- 1
+nc <- 3
 np <- 8 # Number of CPUs
 
 fit2 = jags(data, inits, params,  model.file="./Models/HRmodel.vcov.txt", 
@@ -501,8 +505,7 @@ load(file.path(analysis.path, "fit2.rda"))
 
 #### multidimensional integration ####
 
-# R2Cuba package for multidimensional integration
-library(R2Cuba)
+library(cubature)
 # 2D
 integrand2d1<- function(xy, b1, b2, p) {
   # ellipse
@@ -516,23 +519,6 @@ integrand2d1<- function(xy, b1, b2, p) {
   return(int)
 }
 
-integrand2d2<- function(xy, b1, b2, p, centre, Window) {
-  
-  testx<- centre[1]+xy[1]
-  testy<- centre[2]+xy[2]
-  if(inside.owin(testx,testy,Window)) {
-    d2<- (xy[1]^2 + xy[2]^2)
-    d1<- sqrt(d2)
-    xdev<- xy[1]/p[1]
-    ydev<- xy[2]/p[2]
-    covar<-  2 * p[3] * xdev * ydev
-    e<- (1/(2*pi*p[1]*p[2]*sqrt((1-p[3]^2))))*exp(-(xdev^2 + ydev^2 - covar)/(2*(1-p[3]^2)))
-    int<- e * (1-exp(-exp(b1 + b2*d1)))
-  }
-  else int<- 0
-  return(int)
-}
-
 integrand2d3<- function(xy, b1, b2, p) {
   
   d2<- (xy[1]^2 + xy[2]^2)
@@ -542,10 +528,175 @@ integrand2d3<- function(xy, b1, b2, p) {
   covar<-  2 * p[3] * xdev * ydev
   e<- (1/(2*pi*p[1]*p[2]*sqrt((1-p[3]^2))))*exp(-(xdev^2 + ydev^2 - covar)/(2*(1-p[3]^2)))
   int<- e * (1-exp(-exp(b1 + b2*d1)))
-  
   return(int)
 }
+
+integrand2d3_bis<- function(xy, b1, b2, sigmax, sigmay, rho) {
+  
+  d2<- (xy[1]^2 + xy[2]^2)
+  d1<- sqrt(d2)
+  xdev<- xy[1]/sigmax
+  ydev<- xy[2]/sigmay
+  covar<-  2 * rho * xdev * ydev
+  e<- (1/(2*pi*sigmax*sigmay*sqrt((1-rho^2))))*exp(-(xdev^2 + ydev^2 - covar)/(2*(1-rho^2)))
+  int<- e * (1-exp(-exp(b1 + b2*d1)))
+  return(int)
+}
+
+# wrap integrand2d3_bis with mapply
+mapp_int <- function(b1, b2, sigmax, sigmay, rho,f=integrand2d3_bis, 
+                     lowerLimit=c(-50,-50), upperLimit=c(50,50), tol = 1e-05, 
+                     fDim = 2, maxEval = 5e05, absError = 1e-10, vectorInterface=FALSE,
+                     SIMPLIFY=FALSE) {
+  mapp_list <- mapply(FUN = hcubature, b1=b1, b2=b2, sigmax=sigmax, sigmay=sigmay, rho=rho, 
+                    MoreArgs=list(f=f,lowerLimit=lowerLimit, upperLimit=upperLimit, 
+                                  tol=tol, fDim=fDim, maxEval=maxEval, 
+                                  absError=absError, vectorInterface=vectorInterface), 
+                    SIMPLIFY=SIMPLIFY)
+
+p.det<- data.frame(DProb=t(sapply(mapp_list, "[[", 1))[, 1],
+                   Abs_error=t(sapply(mapp_list, "[[", 1))[, 2])
+return(p.det)
+}
+
+# Tried a vectorised fun passing a matrix, which is supposed to be way faster, but it doesn't work
+integrand2d3_v<- function(xy, b1, b2, sigmax, sigmay, rho) {
+  
+  d2<- (xy[, 1]^2 + xy[, 2]^2)
+  d1<- sqrt(d2)
+  xdev<- xy[, 1]/sigmax
+  ydev<- xy[, 2]/sigmay
+  covar<-  2 * rho * xdev * ydev
+  e<- (1/(2*pi*sigmax*sigmay*sqrt((1-rho^2))))*exp(-(xdev^2 + ydev^2 - covar)/(2*(1-rho^2)))
+  int<- e * (1-exp(-exp(b1 + b2*d1)))
+  return(int)
+}
+
+vec_int <- function(b1, b2, sigmax=sigmax, sigmay=sigmay, rho=rho, limit=50, 
+                    tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10) {
+  njudas <- length(b1)
+  int <- hcubature(f=integrand2d3_v, lowerLimit=matrix(-limit, njudas, 2), 
+                   upperLimit=matrix(limit, njudas, 2), 
+                   b1=b1, b2=b2, sigmax=sigmax, sigmay=sigmay, rho=rho,
+                   tol=tol, fDim=fDim, maxEval=maxEval, absError=absError, 
+                   vectorInterface = TRUE)
+  
+  p.det<- data.frame(DProb=int$integral,
+                     Abs_error=int$error)
+  return(p.det)
+}
+
 #------------------------------------------------------------------------------#
+#### speed test ####
+b1<- fit1.PB2$mean$b1
+b2<- fit1.PB2$mean$b2
+sigmax<- fit2.PB$mean$sigmax 
+sigmay<- fit2.PB$mean$sigmay
+rho <- fit2.PB$mean$rho
+
+njudas <- length(b1)
+
+p.det <- matrix(NA, njudas, 2)
+
+# limit njudas to test speed
+njudas<-5
+t_int <- vector("list", length = 6)
+t_int[[1]] <- system.time(
+for(i in 1:njudas) {
+  message(paste("doing judas No. ", i, sep=""))
+  int <- hcubature(f=integrand2d1, lowerLimit=c(-50,-50), upperLimit=c(50,50), 
+                   b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
+                   tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
+  p.det[i, 1] <- int$integral[1]
+  p.det[i, 2] <- int$error[1]
+} 
+)
+
+t_int[[2]] <- system.time(
+  for(i in 1:njudas) {
+    message(paste("doing judas No. ", i, sep=""))
+    int <- pcubature(f=integrand2d1, lowerLimit=c(-50,-50), upperLimit=c(50,50), 
+                     b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
+                     tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
+    p.det[i, 1] <- int$integral[1]
+    p.det[i, 2] <- int$error[1]
+  } 
+)
+
+t_int[[3]] <- system.time(
+  for(i in 1:njudas) {
+    message(paste("doing judas No. ", i, sep=""))
+    int <- hcubature(f=integrand2d3, lowerLimit=c(-50,-50), upperLimit=c(50,50), 
+                     b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
+                     tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
+    p.det[i, 1] <- int$integral[1]
+    p.det[i, 2] <- int$error[1]
+  } 
+)
+
+t_int[[4]] <- system.time(
+  for(i in 1:njudas) {
+    message(paste("doing judas No. ", i, sep=""))
+    int <- pcubature(f=integrand2d3, lowerLimit=c(-50,-50), upperLimit=c(50,50), 
+                     b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
+                     tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
+    p.det[i, 1] <- int$integral[1]
+    p.det[i, 2] <- int$error[1]
+  } 
+)
+
+t_int[[5]] <- system.time(
+  pdet <- mapp_int(b1[1:njudas], b2[1:njudas], sigmax[1:njudas], 
+                      sigmay[1:njudas], rho[1:njudas])
+)
+
+# This doesn't work :-(
+t_int[[6]] <- system.time(
+    p.det <- vec_int(b1=b1[1:njudas], b2=b2[1:njudas], sigmax=sigmax[1:njudas], 
+                     sigmay=sigmay[1:njudas], rho=rho[1:njudas],
+                     tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
+ )
+
+sapply(t_int, "[[", 3)
+#> 3.64 324.21   0.45  41.64   0.44
+
+#### Integration for PB ####
+b1<- fit1.PB2$mean$b1
+b2<- fit1.PB2$mean$b2
+sigmax<- fit2.PB$mean$sigmax 
+sigmay<- fit2.PB$mean$sigmay
+rho <- fit2.PB$mean$rho
+
+njudas <- length(b1)
+
+system.time(
+  pdet.PB <- mapp_int(b1, b2, sigmax, sigmay, rho)
+)
+
+#### Integration for KM ####
+analysis.path <- "../Data/Analysis"
+load(file = file.path(analysis.path, "fit1.KM2.rda"))
+load(file.path(analysis.path, "fit2.KM.rda"))
+
+b1<- fit1.KM2$mean$b1
+b2<- fit1.KM2$mean$b2
+sigmax<- fit2.KM$mean$sigmax 
+sigmay<- fit2.KM$mean$sigmay
+rho <- fit2.KM$mean$rho
+
+njudas <- length(b1)
+
+system.time(
+  pdet.KM <- mapp_int(b1, b2, sigmax, sigmay, rho)
+)
+
+ggplot(pdet.KM, aes(DProb)) + geom_density() 
+ggsave(filename = file.path(analysis.path, "DProb.density.KM.pdf"))
+
+#### Integration for whole dataset ####
+analysis.path <- "../Data/Analysis"
+load(file = file.path(analysis.path, "fit1.rda"))
+load(file.path(analysis.path, "fit2.rda"))
 
 b1<- fit1$mean$b1
 b2<- fit1$mean$b2
@@ -555,128 +706,10 @@ rho <- fit2$mean$rho
 
 njudas <- length(b1)
 
-p.det <- matrix(NA, njudas, 4)
+system.time(
+  pdet <- mapp_int(b1, b2, sigmax, sigmay, rho)
+)
 
-for(i in 1:njudas) {
-  message(paste("doing judas No. ", i, sep=""))
-  int <- cuhre(2, 1, integrand2d1, lower=c(-50,-50), upper=c(50,50),
-              b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
-              flags=list(verbose=0))
-  p.det[i, 1] <- int$value
-  p.det[i, 2] <- int$abs.error
-  p.det[i, 3] <- int$prob
-  p.det[i, 4] <- ifelse(int$prob>0.1,1,0)
-} 
-
-p.det<- data.frame(p.det)
-names(p.det)<- c("DProb","Abs_error","chiprob","flag")
-#-------------
-# Use individual samples to incorporate uncertainty
-#
-# CAUTION - LONG RUN-TIME:  Best use parallel version
-
-nsims<- 10
-sims1<- fit1$sims.list
-sims2<- fit2$sims.list
-
-n.samples<- fit1$mcmc.info$n.samples
-ss<- sample(1:n.samples,size=nsims,replace=F)
-
-b1<- sims1$b1[ss,]
-b2<- sims1$b2[ss,]
-sigmax<- sims2$sigmax[ss,] 
-sigmay<- sims2$sigmay[ss,]
-rho<- sims2$rho[ss,]
-
-dd<- dim(sigmax)
-
-p.det<- matrix(NA,dd[1],dd[2])
-
-for(i in 1:dd[1]) {
-  message(paste("doing judas No. ",i,sep=""))
-  for(j in 1:dd[2]) {
-    int<- cuhre(2,1,integrand2d1, lower=c(-50,-50),upper=c(50,50),
-                b1=b1[i,j],b2=b2[i,j],p=c(sigmax[i,j],sigmay[i,j],rho[i,j]),
-                flags=list(verbose=0))
-    p.det[i,j]<- int$value
-  } }
-
-#-----------------------------------------------------------
-# Parallel implementation
-################################################################################
-####### Need to check code doSMP not available on CRAN #########################
-################################################################################
-
-workers <- startWorkers(12) # 10 cores
-registerDoSMP(workers)
-start.time<- Sys.time()
-
-p.det2 <- foreach(i=1:dd[1], .combine=rbind, 
-                 .packages=c("spatstat","R2Cuba")) %:% foreach(j=1:dd[2], .combine=c) %dopar% {
-  centre <- c(goats$xbar[goats$ID == id[i]],goats$ybar[goats$ID == id[i]])
-  cuhre(2,1,integrand2d2, lower=c(-50,-50),upper=c(50,50),b1=b1[i,j],b2=b2[i,j],p=c(sigmax[i,j],sigmay[i,j],rho[i,j]),centre=centre,Window=tmpzone,flags=list(verbose=0))$value
-  
-}
-end.time = Sys.time()
-elapsed.time = difftime(end.time, start.time, units='mins')
-elapsed.time
-stopWorkers(workers) 
-
-
-
-#------------------------------------------------------------
-require(doSMP)
-workers <- startWorkers(12) # 10 cores
-registerDoSMP(workers)
-start.time<- Sys.time()
-
-p.det2<- foreach(i=1:dd[1], .combine=rbind, .packages=c("spatstat","R2Cuba")) %:% foreach(j=1:dd[2], .combine=c) %dopar% {
-  centre<- c(goats$xbar[goats$ID == id[i]],goats$ybar[goats$ID == id[i]])
-  cuhre(2,1,integrand2d2, lower=c(-50,-50),upper=c(50,50),b1=b1[i,j],b2=b2[i,j],p=c(sigmax[i,j],sigmay[i,j],rho[i,j]),centre=centre,Window=tmpzone,flags=list(verbose=0))$value
-  
-}
-end.time = Sys.time()
-elapsed.time = difftime(end.time, start.time, units='mins')
-elapsed.time
-stopWorkers(workers) 
-#=====================================================
-
-require(doSMP)
-workers <- startWorkers(12) # 10 cores
-registerDoSMP(workers)
-start.time<- Sys.time()
-
-p.det<- foreach(i=1:dd[1], .combine=rbind, .packages=c("mvtnorm","R2Cuba")) %:% foreach(j=1:dd[2], .combine=c) %dopar% {
-  
-  cuhre(2,1,integrand2d3, lower=c(-50,-50),upper=c(50,50),b1=b1[i,j],b2=b2[i,j],p=c(sigmax[i,j],sigmay[i,j],rho[i,j]),flags=list(verbose=0))$value
-  
-}
-
-end.time = Sys.time()
-elapsed.time = difftime(end.time, start.time, units='mins')
-elapsed.time
-stopWorkers(workers) 
-#rmSessions(all.names=TRUE)
-#----------------------------------------------
-
-par(mfrow=c(2,1))
-
-n<- dim(nontrans)[2]
-boxplot(nontrans[,1:n], notch=F, outline=F,ylim=c(0,1),col="grey80",las=1,ylab="Probability of association",xlab="Goat ID",axes=F)
-axis(1, at=1:n, labels=as.character(jud.tmp$id2[which(jud.tmp$count==0)]),cex.axis=0.5,las=2)
-axis(2, at=seq(0,1,0.2),las=1)
-mtext("a",line=1)
-
-n<- dim(trans)[2]
-boxplot(trans[,1:n], notch=F, outline=F,ylim=c(0,1),col="grey80",las=1,ylab="Probability of association",xlab="Goat ID",axes=F)
-axis(1, at=1:n, labels=as.character(jud.tmp$id2[which(jud.tmp$count==1)]),cex.axis=0.5,las=2)
-axis(2, at=seq(0,1,0.2),las=1)
-mtext("b",line=1) 
-
-
-mean(apply(nontrans,2,mean))
-mean(apply(trans,2,mean))
-
-
-#============================================================================
+ggplot(pdet.PB, aes(DProb, ..scaled..)) + geom_density() 
+ggsave(filename = file.path(analysis.path, "DProb.density.PB.pdf"))
 
