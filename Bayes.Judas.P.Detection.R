@@ -335,6 +335,7 @@ hDist <- mapply(compute.hDist, b1=fit1$mean$b1, b2=fit1$mean$b2,
 
 pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1$mean$b1)))
 ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
+ggsave(file.path(analysis.path, "Density.dist.Dprob_Dist.CA.pdf"))
 
 mu.b1.backtrans <- 1-exp(-exp(fit1$mean$mu.b1))
 mu.b2.backtrans <- 1-exp(-exp(fit1$mean$mu.b2))
@@ -661,6 +662,10 @@ sapply(t_int, "[[", 3)
 #> 3.64 324.21   0.45  41.64   0.44
 
 #### Integration for PB ####
+analysis.path <- "../Data/Analysis"
+load(file = file.path(analysis.path, "fit1.PB2.rda"))
+load(file.path(analysis.path, "fit2.PB.rda"))
+
 b1<- fit1.PB2$mean$b1
 b2<- fit1.PB2$mean$b2
 sigmax<- fit2.PB$mean$sigmax 
@@ -672,6 +677,9 @@ njudas <- length(b1)
 system.time(
   pdet.PB <- mapp_int(b1, b2, sigmax, sigmay, rho)
 )
+quantile(pdet.PB[, 1], probs = c(0.025, 0.975))
+# 2.5%       97.5% 
+#  0.007055694 0.070258962 
 
 #### Integration for KM ####
 analysis.path <- "../Data/Analysis"
@@ -692,6 +700,9 @@ system.time(
 
 ggplot(pdet.KM, aes(DProb)) + geom_density() 
 ggsave(filename = file.path(analysis.path, "DProb.density.KM.pdf"))
+quantile(pdet.KM[, 1], probs = c(0.025, 0.975))
+# 2.5%       97.5% 
+#  0.008629166 0.070037964 
 
 #### Integration for whole dataset ####
 analysis.path <- "../Data/Analysis"
@@ -710,6 +721,9 @@ system.time(
   pdet <- mapp_int(b1, b2, sigmax, sigmay, rho)
 )
 
-ggplot(pdet.PB, aes(DProb, ..scaled..)) + geom_density() 
-ggsave(filename = file.path(analysis.path, "DProb.density.PB.pdf"))
+ggplot(pdet, aes(DProb, ..scaled..)) + geom_density() 
+ggsave(filename = file.path(analysis.path, "DProb.density.CA.pdf"))
 
+quantile(pdet[, 1], probs = c(0.025, 0.975))
+#   2.5%       97.5% 
+#  0.008305563 0.069610217 
