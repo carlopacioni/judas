@@ -1,0 +1,28 @@
+
+    model {
+     for(i in 1 : N2) { 
+     dev[i,1:2] ~ dmnorm.vcov(mean[1:2], Sigma[id2[i],1:2,1:2])
+    }
+    
+ 
+	 mu.sigmax.pop ~ dt(0, 1, 4) T(0,)
+	 tau.sigmax.pop ~ dt(0,1, 4) T(0,)
+	 
+	 mu.sigmay.pop ~ dt(0, 1, 4) T(0,)
+	 tau.sigmay.pop ~ dt(0,1, 4) T(0,)
+
+	 mu.rho.pop ~ dunif(-1, 1)
+	 sigma.rho.pop ~ dt(0,1, 4) T(0,)
+	 tau.rho.pop <- 1/pow(sigma.rho.pop, 2)
+	 
+    for(j in 1:M) {
+     Sigma[j,1,1]<- pow(sigmax[j],2)
+     sigmax[j] ~ dt(mu.sigmax.pop, tau.sigmax.pop, 4) T(0,)
+     Sigma[j,2,2]<- pow(sigmay[j],2)
+     sigmay[j] ~ dt(mu.sigmay.pop, tau.sigmay.pop, 4) T(0,)
+     Sigma[j,1,2]<- rho[j]*sigmax[j]*sigmay[j]
+     Sigma[j,2,1]<- Sigma[j,1,2]
+     rho[j] ~ dnorm(mu.rho.pop, tau.rho.pop) T(-1, 1)
+    }
+  }
+    

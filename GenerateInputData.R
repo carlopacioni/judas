@@ -52,53 +52,111 @@ judas.cleaned <- judas.cleaned[Time.deployment>0, ]
 judas.cleaned[TrackedShire == "other", .N]
 judas.cleaned <- judas.cleaned[TrackedShire != "other",]
 
-# Check whether there are judas with < 5 data points and rm
-locs <- judas.cleaned[, .N, by=JUDAS_ID]
-locs[, sum(N<6)]
-IDs.rm <- locs[N<6, JUDAS_ID]
-judas.cleaned <- judas.cleaned[!JUDAS_ID %in% IDs.rm, ]
+# subset judas.clean to 1995-2007 for KM and 1999-2001&2007-2010 for PB (PB runthe analysis with 2 month timewindow)
+judas.cleaned[, Date := as.Date(Date)] 
+judas.cleaned.surv <- judas.cleaned[(Region == "KIMBERLEY" & 
+                                      Year >= 1995 & Year <= 2007) |
+                                     (Region == "PILBARA" & 
+                                        (Year >= 2007 & Year <= 2010)), ]
+
+# Rm judas whose only entry is when they were collared
+ntrack.events.surv <- judas.cleaned.surv[, .N, by=JUDAS_ID]
+ntrack.events.surv[, summary(N)]
+judas.cleaned.surv.one <- judas.cleaned.surv[JUDAS_ID %in% ntrack.events.surv[N==1, JUDAS_ID],]
+
+judas.cleaned.surv <- judas.cleaned.surv[!JUDAS_ID %in% 
+                                           judas.cleaned.surv.one[ACTION == "COLLARED", JUDAS_ID], ]
+
+# Retain only IDs that are going to be used for surv analysis
+# judas.cleaned.HR has more location s per animals because it retains also the 
+    # location outside the year interval selected for survival analysis
+judas.cleaned.HR <- judas.cleaned[JUDAS_ID %in% judas.cleaned.surv[, unique(JUDAS_ID)],]
+
+# Check whether there are judas with < minloc data points and rm
+locs <- judas.cleaned.HR[, .N, by=JUDAS_ID]
+minloc <- 5
+locs[, sum(N < minloc)]
+judas.cleaned.HR <- judas.cleaned.HR[!JUDAS_ID %in% locs[N < minloc, JUDAS_ID], ]
+
+# Jitter coordinates (by ~ 5 km) when there are multiple entries with same coordinates
+judas.cleaned.HR<-judas.cleaned.HR[
+  duplicated(judas.cleaned.HR[, round(Latitude, digits=5)], by="Latitude"), 
+  Latitude:=jitter(Latitude, amount = 0.045), by=JUDAS_ID]
+judas.cleaned.HR<-judas.cleaned.HR[
+  duplicated(judas.cleaned.HR[, round(Longitude, digits=5)], by="Longitude"), 
+  Longitude:=jitter(Longitude, amount = 0.045), by=JUDAS_ID]
 
 # Home Range centres
-judas.cleaned[, ':='(HRlat=mean(Latitude), HRlong=mean(Longitude)), by=JUDAS_ID]
+judas.cleaned.HR[, ':='(HRlat=mean(Latitude), HRlong=mean(Longitude)), by=JUDAS_ID]
 
 # Calculate deviations from HRcentres 
-judas.cleaned[, xdev:=calc.latlong.dist(judas.cleaned[, .(Latitude, HRlong)],
-                                        judas.cleaned[, .(HRlat, HRlong)])]
-judas.cleaned[, ydev:=calc.latlong.dist(judas.cleaned[, .(HRlat, Longitude)],
-                                        judas.cleaned[, .(HRlat, HRlong)])]
-judas.cleaned[, summary(xdev)]
-judas.cleaned[, summary(ydev)]
+judas.cleaned.HR[, xdev:=calc.latlong.dist(judas.cleaned.HR[, .(HRlat, Longitude)],
+                                        judas.cleaned.HR[, .(HRlat, HRlong)])]
+judas.cleaned.HR[, ydev:=calc.latlong.dist(judas.cleaned.HR[, .(Latitude, HRlong)],
+                                           judas.cleaned.HR[, .(HRlat, HRlong)])]
+judas.cleaned.HR[, summary(xdev)]
+judas.cleaned.HR[, summary(ydev)]
 
-ggplot(judas.cleaned) + geom_density(aes(xdev), col="blue") + 
+ggplot(judas.cleaned.HR) + geom_density(aes(xdev), col="blue") + 
   geom_density(aes(ydev), col="red") + xlim(c(0, 60))
 
-descr.fin <- judas.cleaned[, .(njudas=length(unique(JUDAS_ID)), 
-                               start.date=min(Date), end.date=max(Date)), 
-                           by=c("Region", "Shire")]
-descr.fin
-descr.fin[, sum(njudas)]
-write.csv(descr.fin, file = file.path(data.path, "Analysis", "descr.fin.in.surv.csv"), 
-          row.names = F)
+chk <- judas.cleaned.HR[, .(Meanx=mean(xdev), SDx=sd(xdev),
+                               Meany=mean(ydev), SDy=sd(ydev)), by=JUDAS_ID]
 
-ntrack.events <- judas.cleaned[, .N, by=JUDAS_ID]
-ntrack.events[, summary(N)]
+ggplot(chk, aes(Meanx, Meany)) + geom_point()
+ggplot(chk, aes(SDx, SDy)) + geom_point() 
+
+ggplot(chk, aes(SDx, SDy)) + geom_point() + xlim(c(0,5)) + ylim(c(0,5))
+
+chk[, quantile(SDx, probs = seq(0.8, 1, by = 0.02))]
+chk[, quantile(SDy, probs = seq(0.8, 1, by = 0.02))]
+chk[, quantile(c(SDx, SDy), probs = seq(0.8, 1, by = 0.02))]
+
+ggplot(judas.cleaned.HR) + geom_density(aes(xdev), col="blue") + 
+  geom_density(aes(ydev), col="red") + xlim(c(0, 60))
+
+
+# Retain only IDs that were kept for HR analysis
+judas.cleaned.surv <- judas.cleaned.surv[JUDAS_ID %in% judas.cleaned.HR[, JUDAS_ID]]
+
+ntrack.events.HR <- judas.cleaned.HR[, .N, by=JUDAS_ID]
+ntrack.events.HR[, summary(N)]
+
+ntrack.events.surv <- judas.cleaned.surv[, .N, by=JUDAS_ID]
+ntrack.events.surv[, summary(N)]
 ###########################################################################
 
-names(judas.cleaned)
-setkey(judas.cleaned, JUDAS_ID)
+# Adjust start.date and end.date to stay within the year interval considered
+judas.cleaned.surv[, start.date := ifelse(test = Region == "KIMBERLEY" & year(start.date) < 1995,
+                            "1995-03-01", start.date)]
+
+judas.cleaned.surv[, end.date := ifelse(test = Region == "KIMBERLEY" & year(end.date) > 2007,
+                                          "2007-11-30", end.date)]
+
+judas.cleaned.surv[, start.date := ifelse(test = Region == "PILBARA" & year(start.date) < 2007,
+                                          "2007-04-01", start.date)]
+
+judas.cleaned.surv[, end.date := ifelse(test = Region == "PILBARA" & year(end.date) > 2010,
+                                        "2010-12-31", end.date)]
+
+names(judas.cleaned.surv)
+setkey(judas.cleaned.surv, JUDAS_ID)
+setkey(judas.cleaned.HR, JUDAS_ID)
 
 # List all info re each judas
-list.IDs <- judas.cleaned[, unique(JUDAS_ID)]
-judas.info <- judas.cleaned[list.IDs, .SD, 
-                            .SDcols=c("JUDAS_ID","Region", "start.date", "end.date", 
-                                      "Time.deployment", "Time.dep.years", 
-                                      "HRlong", "HRlat"),
+list.IDs <- judas.cleaned.surv[, unique(JUDAS_ID)]
+judas.info <- judas.cleaned.surv[list.IDs, .SD, 
+                            .SDcols=c("JUDAS_ID", "Region", "start.date", "end.date"),
                             mult="first"]
 setkey(judas.info, JUDAS_ID)
+HR.info <- judas.cleaned.HR[list.IDs, .SD, 
+                                 .SDcols=c("JUDAS_ID", "HRlat", "HRlong"  ),
+                                 mult="first"]
+judas.info <- merge(judas.info, HR.info, all.x = T)
 
 # Find all possible associations
 # RcppAlgos::comboGeneral is much faster than combn
-combs <- RcppAlgos::comboGeneral(judas.cleaned[, unique(JUDAS_ID)], 2)
+combs <- RcppAlgos::comboGeneral(judas.cleaned.surv[, unique(JUDAS_ID)], 2)
 
 # Collate info together
 judas.Dist<- data.table(combs)
@@ -121,7 +179,7 @@ setnames(judas.Dist, "JUDAS_ID", "ID.2")
 # Calculate distance between HR centres
 judas.Dist[, Dist := calc.latlong.dist(judas.Dist[, .(HRlat.1, HRlong.1)], 
                                     judas.Dist[, .(HRlat.2, HRlong.2)])]
-key(judas.cleaned) # Confirm that Judas_ID is the key
+key(judas.cleaned.surv) # Confirm that Judas_ID is the key
 
 judas.Dist[, Concurrent := 
              ifelse(end.date.1 < start.date.2 | end.date.2 < start.date.1, 'no', "yes")]
@@ -131,17 +189,6 @@ judas.Dist <- judas.Dist["yes", ] # get rid of judas pairs that were not present
 # Keep only pairs from the same region
 judas.Dist[, RegCheck:=Region.1 == Region.2]
 judas.Dist <- judas.Dist[(RegCheck),]
-
-# subset judas.clean to 1995-2007 for KM and 1999-2001&2007-2010 for PB (PB runthe analysis with 2 month timewindow)
-judas.cleaned[, Date := as.Date(Date)] 
-judas.cleaned.sub <- judas.cleaned[(Region == "KIMBERLEY" & 
-                                      Year >= 1994 & Year <= 2007) |
-                                     (Region == "PILBARA" & 
-                                        ((Year >= 1999 & Year <= 2001) | 
-                                           (Year >= 2007 & Year <= 2010))), ]
-
-cleanded.sub.ids <- judas.cleaned.sub[, unique(JUDAS_ID)]
-judas.Dist <- judas.Dist[ID.1 %in% cleanded.sub.ids & ID.2 %in% cleanded.sub.ids,]
 
 # Prepare columns
 # event is 0 when there is no encounter, and 1 when there is
@@ -172,8 +219,8 @@ rns <- nrow(judas.Dist) # Number of judas pairs
 # but I didn't bother. Worth considering for larger datasets though.
 system.time(
 for(rn in seq_len(rns)) {
-  data.ID1 <- judas.cleaned.sub[judas.Dist[rn, ID.1], ]
-  data.ID2 <- judas.cleaned.sub[judas.Dist[rn, ID.2], ]
+  data.ID1 <- judas.cleaned.surv[judas.Dist[rn, ID.1], ]
+  data.ID2 <- judas.cleaned.surv[judas.Dist[rn, ID.2], ]
   matching.Events <- data.ID1[, EVENT_ID] %in% data.ID2[, EVENT_ID]
   data.Evs <- data.ID1[matching.Events, ]
   if(nrow(data.Evs) > 0) {
@@ -195,21 +242,12 @@ for(rn in seq_len(rns)) {
 }
 )
 
-write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
-save(judas.Dist, file = file.path(data.path, "judas.Dist.rda"))
-save(judas.cleaned, file = file.path(data.path, "judas.cleaned.fin.rda"))
-save(judas.cleaned.sub, file = file.path(data.path, "judas.cleaned.sub.rda"))
-
 #### Balance id1 and id2 to similar counts ####
-# If resumed
-#------------------------------------------------------------------------------#
-data.path <- "../Data/"
-load(file = file.path(data.path, "judas.Dist.rda"))
-#------------------------------------------------------------------------------#
 # Compute descriptive stats of distance when event=1
 judas.Dist[event == 1, summary(Dist)]
 ggplot(judas.Dist[event == 1, ], aes(Dist)) + geom_density() + xlim(c(0, 100))
 
+# Apply a cut off beyond max Dist where encounter occurs
 max.Dist <- judas.Dist[event == 1, max(Dist)]
 judas.Dist.Bal <- judas.Dist[Dist <= max.Dist,]
 judas.Dist.Bal[, Rn:=seq_len(nrow(judas.Dist[Dist <= max.Dist,]))]
@@ -290,6 +328,17 @@ counts[, quantile(prop, probs = 0.025)]
 counts[, quantile(prop, probs = 0.975)]
 counts[, summary(prop)]
 
+# Subset judas for HR analysis that were kept in survival analysis as ID1 in Dist.Bal
+judas.cleaned.HR <- judas.cleaned.HR[JUDAS_ID %in% judas.Dist.Bal[, unique(ID.1)],]
+
+# Number of judas retained
+judas.Dist.Bal[, length(unique(ID.1))]
+
+write.csv(judas.Dist, file = file.path(data.path, "judas.Dist.csv"), row.names = F)
+save(judas.Dist, file = file.path(data.path, "judas.Dist.rda"))
+save(judas.cleaned, file = file.path(data.path, "judas.cleaned.rda"))
+save(judas.cleaned.surv, file = file.path(data.path, "judas.cleaned.surv.rda"))
+save(judas.cleaned.HR, file = file.path(data.path, "judas.cleaned.HR.rda"))
 # Note that data regarding ID.1 and ID.2 may be swapped now
 # To track these it should be possible to add a col "swab" and add 1 each time a 
 # line is swabbed so that it is then possible to adjust other cols
