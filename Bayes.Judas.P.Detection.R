@@ -27,9 +27,7 @@ compute.hJudas <- function (fit, M) {
 
 #------------------------------------------------------------------------------#
 
-
 data.path <- "../Data/"
-load(file = file.path(data.path, "judas.cleaned.sub.rda"))
 load(file = file.path(data.path, "judas.Dist.Bal.rda"))
 
 #### Judas association probability - Discrete survival analysis ####
@@ -41,18 +39,14 @@ ggplot(judas.Dist.Bal, aes(Dist)) + geom_density() + xlim(c(0, 100))
 hist(judas.Dist.Bal[, time])
 
 #### Fit model to PILBARA donkeys ####
-judas.cleaned.PB <- judas.cleaned.sub[Region == "PILBARA",]
 judas.Dist.Bal.PB <- judas.Dist.Bal[Region.1 == "PILBARA",]
 judas.Dist.Bal.PB[event == 1, summary(Dist)]
 judas.Dist.Bal.PB[event == 0, summary(Dist)]  
 hist(judas.Dist.Bal.PB[, time])
 
-# Number of all possible judas pairs concurrently deployed 
-npairs.PB <- nrow(judas.Dist.Bal.PB)
-
 # Number of all retained observation of each judas
 N2.PB <- nrow(judas.cleaned.PB)
-JUDAS_ID.PB <- judas.Dist.Bal.PB[, unique(ID.1)] 
+JUDAS_ID.PB <-  
 judas_id_cleaned.PB <- judas.cleaned.PB[, unique(JUDAS_ID)]
 
 # y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
@@ -61,7 +55,7 @@ judas_id_cleaned.PB <- judas.cleaned.PB[, unique(JUDAS_ID)]
 # time is in (integer) months
 
 N1 <- npairs.PB
-M <- length(JUDAS_ID.PB)
+M <- length(judas.Dist.Bal.PB[, unique(ID.1)])
 id1 <- judas.Dist.Bal.PB[, as.numeric(unclass(as.factor(ID.1)))]
 time <- judas.Dist.Bal.PB[, floor(time / (30.4 * 2)) + 1]
 d <- judas.Dist.Bal.PB[, event]
@@ -80,11 +74,9 @@ sum(t)
 sum(d)
 dim(y)
 
-
 data.PB <- list(y=y, N1=N1, M=M, id1=id1, time=time, distance=distance)
 sapply(data.PB, class)
 hist(data.PB$time)
-
 
 # b1.init <- rnorm(length(JUDAS_ID.PB), sd = 0.5)
 # b2.init <- rnorm(length(JUDAS_ID.PB), sd = 0.5)
@@ -94,58 +86,57 @@ inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1)
 
 params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","b1","b2")
 
-ni <- 20000
+ni <- 40000
 nb <- 10000
 nthin <- 1
-nc <- 3
+nc <- 4
 np <- 8 # Number of CPUs
 
-fit1.PB = jags(data.PB, inits, params,  model.file="./Models/SurvDist2.txt", 
+fit1.PB2 = jags(data.PB, inits, params,  model.file="./Models/SurvDist2.txt", 
                 n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
                 parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
-summary(fit1.PB)
-print(fit1.PB,digits=3) 
-sapply(fit1.PB$n.eff, summary)
-sapply(fit1.PB$Rhat, summary)
-plot(fit1.PB)
+summary(fit1.PB2)
+print(fit1.PB2,digits=3) 
+sapply(fit1.PB2$n.eff, summary)
+sapply(fit1.PB2$Rhat, summary)
+plot(fit1.PB2)
+fit1.PB2$mean[1:4]
 
-# fit1.PB$sims.list
+hist(fit1.PB2$mean$b1)
+hist(fit1.PB2$mean$b2)
+summary(fit1.PB2$mean$b2)
 
+ggplot(data.frame(b1=fit1.PB2$mean$b1, b2=fit1.PB2$mean$b2), aes(b1, b2)) +
+  geom_point() + geom_smooth()
 analysis.path <- "../Data/Analysis"
-save(fit1.PB, file = file.path(analysis.path, "fit1.PB.rda"))
-load(file = file.path(analysis.path, "fit1.PB.rda"))
+save(fit1.PB2, file = file.path(analysis.path, "fit1.PB2.rda"))
 
 # Prob profile
-hDist <- mapply(compute.hDist, b1=fit1.PB$mean$b1, b2=fit1.PB$mean$b2, 
-             Dist=seq(0, 50, length.out=length(fit1.PB$mean$b1)))
+hDist <- mapply(compute.hDist, b1=fit1.PB2$mean$b1, b2=fit1.PB2$mean$b2, 
+                Dist=seq(0, 50, length.out=length(fit1.PB2$mean$b1)))
 
-pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.PB$mean$b1)))
+pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.PB2$mean$b1)))
 ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
+ggsave(file.path(analysis.path, "Density.dist.Dprob_Dist.PB.pdf"))
 
-mu.b1.PB.backtrans <- 1-exp(-exp(fit1.PB$mean$mu.b1))
-mu.b2.PB.backtrans <- 1-exp(-exp(fit1.PB$mean$mu.b2))
+mu.b1.PB.backtrans <- 1-exp(-exp(fit1.PB2$mean$mu.b1))
+mu.b2.PB.backtrans <- 1-exp(-exp(fit1.PB2$mean$mu.b2))
 #------------------------------------------------------------------------------#
 
 #### Fit model to KM donkeys ####
-judas.cleaned.KM <- judas.cleaned.sub[Region == "KIMBERLEY",]
 judas.Dist.Bal.KM <- judas.Dist.Bal[Region.1 == "KIMBERLEY",]
 judas.Dist.Bal.KM[event == 1, summary(Dist)]
 judas.Dist.Bal.KM[event == 0, summary(Dist)]  
 # judas.Dist.Bal.KM <- judas.Dist.Bal.KM[Dist < 50,]
 
-# Number of all possible judas pairs concurrently deployed 
-npairs.KM <- nrow(judas.Dist.Bal.KM)
-
-# Number judas
-JUDAS_ID.KM <- judas.Dist.Bal.KM[, unique(ID.1)] 
 
 # y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
 # N1 is the number of observations (pairs); M is the number of individuals
-# time is in (integer) months
-N1 <- npairs.KM
-M <- length(JUDAS_ID.KM)
+# time is in (integer) 2-month periods
+N1 <- nrow(judas.Dist.Bal.KM)
+M <- length(judas.Dist.Bal.KM[, unique(ID.1)])
 id1 <- judas.Dist.Bal.KM[, as.numeric(unclass(as.factor(ID.1)))]
 time <- judas.Dist.Bal.KM[, floor(time / (30.4 * 2)) + 1]
 d <- judas.Dist.Bal.KM[, event]
@@ -168,7 +159,6 @@ data.KM <- list(y=y, N1=N1, M=M, id1=id1, time=time, distance=distance)
 
 sapply(data.KM, class)
 hist(data.KM$time)
-apply(y, 1, class)
 
 # b1.init <- rnorm(length(JUDAS_ID.KM), sd = 0.5)
 # b2.init <- rnorm(length(JUDAS_ID.KM), sd = 0.5)
@@ -178,52 +168,52 @@ inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1)}
 params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2", "b1","b2")
 
 
-ni <- 20000
+ni <- 400000
 nb <- 10000
-nthin <- 1
-nc <- 3
+nthin <- 10
+nc <- 4
 np <- 8 # Number of CPUs
-fit1.KM = jags(data.KM, inits, params,  model.file="./Models/SurvDist2.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
-               parallel=ifelse(nc>1, TRUE, FALSE), 
-               n.cores=ifelse(floor(nc/np) < np, nc, np))
+fit1.KM2 = jags(data.KM, inits, params,  model.file="./Models/SurvDist2.txt", 
+                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt=100000, 
+                parallel=ifelse(nc>1, TRUE, FALSE), 
+                n.cores=ifelse(floor(nc/np) < np, nc, np))
 
-summary(fit1.KM)
-print(fit1.KM,digits=3) 
-sapply(fit1.KM$n.eff, summary)
-sapply(fit1.KM$Rhat, summary)
-plot(fit1.KM)
+summary(fit1.KM2)
+print(fit1.KM2,digits=3) 
+sapply(fit1.KM2$n.eff, summary)
+sapply(fit1.KM2$Rhat, summary)
+plot(fit1.KM2)
+fit1.KM2$mean[1:4]
 
-# fit1.KM$sims.list
+ggplot(data.frame(b1=fit1.KM2$mean$b1, b2=fit1.KM2$mean$b2), aes(b1, b2)) +
+  geom_point() + geom_smooth()
+
+hist(fit1.KM2$mean$b1)
+hist(fit1.KM2$mean$b2)
+summary(fit1.KM2$mean$b2)
 
 analysis.path <- "../Data/Analysis"
-save(fit1.KM, file = file.path(analysis.path, "fit1.KM.rda"))
+save(fit1.KM2, file = file.path(analysis.path, "fit1.KM2.rda"))
 
 # Prob profile
-hDist <- mapply(compute.hDist, b1=fit1.KM$mean$b1, b2=fit1.KM$mean$b2, 
-                Dist=seq(0, 50, length.out=length(fit1.KM$mean$b1)))
+hDist <- mapply(compute.hDist, b1=fit1.KM2$mean$b1, b2=fit1.KM2$mean$b2, 
+                Dist=seq(0, 50, length.out=length(fit1.KM2$mean$b1)))
 
-pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.KM$mean$b1)))
+pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1.KM2$mean$b1)))
 ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
+ggsave(file.path(analysis.path, "Density.dist.Dprob_Dist.KM.pdf"))
 
-mu.b1.KM.backtrans <- 1-exp(-exp(fit1.KM$mean$mu.b1))
-mu.b2.KM.backtrans <- 1-exp(-exp(fit1.KM$mean$mu.b2))
+mu.b1.KM.backtrans <- 1-exp(-exp(fit1.KM2$mean$mu.b1))
+mu.b2.KM.backtrans <- 1-exp(-exp(fit1.KM2$mean$mu.b2))
 #------------------------------------------------------------------------------#
 
 #### Fit model to whole dataset ####
 
-# Number of all possible judas pairs concurrently deployed 
-npairs <- nrow(judas.Dist.Bal)
-
-# Number of all retained observation of each judas
-N2 <- nrow(judas.cleaned.sub)
-JUDAS_ID <- judas.Dist.Bal[, unique(ID.1)] 
-
 # y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
 # N1 is the number of observations (pairs); M is the number of individuals
 # time is in (integer) months
-N1 <- npairs
-M <- length(JUDAS_ID)
+N1 <- nrow(judas.Dist.Bal)
+M <- length(judas.Dist.Bal[, unique(ID.1)])
 id1 <- judas.Dist.Bal[, as.numeric(unclass(as.factor(ID.1)))]
 time <- judas.Dist.Bal[, floor(time / (30.4 * 2)) + 1]
 d <- judas.Dist.Bal[, event]
@@ -249,23 +239,19 @@ sapply(data, class)
 # b1.init <- rnorm(length(JUDAS_ID), sd = 0.5)
 # b2.init <- rnorm(length(JUDAS_ID), sd = 0.5)
 
-inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1, 
-                         rho.b=runif(1, -1, 1), 
-                         B.hat=cbind(rnorm(length(JUDAS_ID), sd = 0.5), 
-                                     rnorm(length(JUDAS_ID), sd = 0.5)))}
+inits <- function(){list(mu.b1= -1, mu.b2=0, sigma.b1=1, sigma.b2=1)}
 
-params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2","rho.b", "b1","b2")
+params <- c("mu.b1","mu.b2","sigma.b1","sigma.b2", "b1","b2")
 
-
-ni <- 20000
+ni <- 400000
 nb <- 10000
-nthin <- 10
-nc <- 3
+nthin <- 20
+nc <- 4
 np <- 8 # Number of CPUs
-fit1 = jags(data, inits, params,  model.file="./Models/SurvDist.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, n.adapt=5000, 
-               parallel=ifelse(nc>1, TRUE, FALSE), 
-               n.cores=ifelse(floor(nc/np) < np, nc, np))
+fit1 = jags(data, inits, params,  model.file="./Models/SurvDist2.txt", 
+            n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt=5000, 
+            parallel=ifelse(nc>1, TRUE, FALSE), 
+            n.cores=ifelse(floor(nc/np) < np, nc, np))
 
 summary(fit1)
 print(fit1,digits=3) 
@@ -284,30 +270,32 @@ hDist <- mapply(compute.hDist, b1=fit1$mean$b1, b2=fit1$mean$b2,
 
 pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1$mean$b1)))
 ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
+ggsave(file.path(analysis.path, "Density.dist.Dprob_Dist.CA.pdf"))
 
 mu.b1.backtrans <- 1-exp(-exp(fit1$mean$mu.b1))
 mu.b2.backtrans <- 1-exp(-exp(fit1$mean$mu.b2))
-
-
 #=============================================================================#
 
 #### Bivariate HR model ####
+data.path <- "../Data/"
+load(file = file.path(data.path, "judas.cleaned.HR.rda"))
 
 # Fit to PB data
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
 # id2 is the index of individuals of the retained observation of judas
-# Number of all retained observation of each judas
-nobs<- judas.cleaned.PB %>% group_by(JUDAS_ID) %>% summarise(n=n())
-nobs<- filter(nobs, n>=10)
-judas.tmp.PB<- filter(judas.cleaned.PB, JUDAS_ID %in% nobs$JUDAS_ID)
-judas.tmp.PB<- data.table(judas.tmp.PB)
+# Confirm min number of observations
+nobs.PB <- judas.cleaned.HR.PB[, .N, by=JUDAS_ID]
+nobs.PB[, summary(N)]
+# setkey(judas.cleaned.HR.PB, JUDAS_ID)
+# judas.cleaned.HR.PB <- judas.cleaned.HR.PB[nobs.PB[N>=5, JUDAS_ID], ]
 
-n <- length(judas.tmp.PB[, unique(JUDAS_ID)])
-data <- list(N2=nrow(judas.tmp.PB), M=n, mean=c(0,0), 
-             id2=judas.tmp.PB[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
-            dev=as.matrix(judas.tmp.PB[, .(xdev, ydev)]))
+N2.PB <- nrow(judas.cleaned.HR.PB)
+n <- length(judas.cleaned.HR.PB[, unique(JUDAS_ID)])
+data <- list(N2=N2.PB, M=n, mean=c(0,0), 
+             id2=judas.cleaned.HR.PB[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
+             dev=as.matrix(judas.cleaned.HR.PB[, .(xdev, ydev)]))
 
 inits <- function(){list(mu.sigmax=0,r=rep(0.5,n),
                          mu.sigmay=0,mu.rho=0.5,sigx=1,sigy=1,
@@ -336,39 +324,6 @@ traceplot(fit2.PB, parameters="sigmay")
 save(fit2.PB, file = file.path(analysis.path, "fit2.PB.rda"))
 load(file.path(analysis.path, "fit2.PB.rda"))
 #------------------------------------------------------------------------------#
-#   Fit model with overarching priors
-inits <- function(){list(mu.sigmax.pop=runif(1, 0, 4),
-                         tau.sigmax.pop=runif(1, 0, 4),
-                         mu.sigmay.pop=runif(1, 0, 4),
-                         tau.sigmay.pop=runif(1, 0, 4), 
-                         mu.rho.pop=runif(1, -1, 1),
-                         sigma.rho.pop=runif(1, 0, 0.5))}
-
-params<- c("mu.sigmax.pop", "tau.sigmax.pop", "mu.sigmay.pop", "tau.sigmay.pop",
-           "mu.rho.pop", "sigma.rho.pop", "rho", "sigmax","sigmay")
-
-# fit model to data using WinBUGS code
-ni <- 3000
-nb <- 1000
-nthin <- 1
-nc <- 3
-np <- 8 # Number of CPUs
-fit2.PB2 <- jags(data, inits, params,  model.file="./Models/HRmodel.vcov.hyperpriors.txt", 
-                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
-                parallel=ifelse(nc>1, TRUE, FALSE), 
-                n.cores=ifelse(floor(nc/np) < np, nc, np))
-
-summary(fit2.PB2)
-print(fit2.PB2, digits=3) 
-sapply(fit2.PB2$n.eff, summary)
-sapply(fit2.PB2$Rhat, summary)
-plot(fit2.PB2)
-traceplot(fit2.PB2, parameters="rho")
-traceplot(fit2.PB2, parameters="sigmay")
-save(fit2.PB2, file = file.path(analysis.path, "fit2.PB.rda"))
-load(file.path(analysis.path, "fit2.PB2.rda"))
-
-#------------------------------------------------------------------------------#
 
 # Fit to KM data
 # dev are the deviates in the X and Y  dimensions; 
@@ -376,16 +331,17 @@ load(file.path(analysis.path, "fit2.PB2.rda"))
 # M is the number of individuals; mean[] is given as data c(0,0)
 # id2 is the index of individuals of the retained observation of judas
 
-# Number of all retained observation of each judas
-nobs<- judas.cleaned.KM %>% group_by(JUDAS_ID) %>% summarise(n=n())
-nobs<- filter(nobs, n>=10)
-judas.tmp.KM<- filter(judas.cleaned.KM, JUDAS_ID %in% nobs$JUDAS_ID)
-judas.tmp.KM<- data.table(judas.tmp.KM)
+judas.cleaned.HR.KM <- judas.cleaned.HR[Region == "KIMBERLEY",]
 
-n <- length(judas.tmp.KM[, unique(JUDAS_ID)])
-data <- list(N2=nrow(judas.tmp.KM), M=n, mean=c(0,0), 
-             id2=judas.tmp.KM[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
-             dev=as.matrix(judas.tmp.KM[, .(xdev, ydev)]))
+# Confirm min number of observations
+nobs.KM <- judas.cleaned.HR.KM[, .N, by=JUDAS_ID]
+nobs.KM[, summary(N)]
+
+N2.KM <- nrow(judas.cleaned.HR.KM)
+n <- length(judas.cleaned.HR.KM[, unique(JUDAS_ID)])
+data <- list(N2=N2.KM, M=n, mean=c(0,0), 
+             id2=judas.cleaned.HR.KM[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
+             dev=as.matrix(judas.cleaned.HR.KM[, .(xdev, ydev)]))
 
 inits <- function(){list(mu.sigmax=0,
                          mu.sigmay=0,mu.rho=0.5,sigx=1,sigy=1,
@@ -415,40 +371,6 @@ save(fit2.KM, file = file.path(analysis.path, "fit2.KM.rda"))
 load(file.path(analysis.path, "fit2.KM.rda"))
 
 #------------------------------------------------------------------------------#
-#   Fit model with overarching priors
-inits <- function(){list(mu.sigmax.pop=runif(1, 0, 4),
-                         tau.sigmax.pop=runif(1, 0, 4),
-                         mu.sigmay.pop=runif(1, 0, 4),
-                         tau.sigmay.pop=runif(1, 0, 4), 
-                         mu.rho.pop=runif(1, -1, 1),
-                         sigma.rho.pop=runif(1, 0, 0.5))}
-
-params<- c("mu.sigmax.pop", "tau.sigmax.pop", "mu.sigmay.pop", "tau.sigmay.pop",
-           "mu.rho.pop", "sigma.rho.pop", "rho", "sigmax","sigmay")
-
-# fit model to data using WinBUGS code
-ni <- 5000
-nb <- 1000
-nthin <- 1
-nc <- 4
-np <- 8 # Number of CPUs
-fit2.KM2 <- jags(data, inits, params,  model.file="./Models/HRmodel.vcov.hyperpriors.txt", 
-                 n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
-                 parallel=ifelse(nc>1, TRUE, FALSE), 
-                 n.cores=ifelse(floor(nc/np) < np, nc, np))
-
-summary(fit2.KM2)
-print(fit2.KM2, digits=3) 
-sapply(fit2.KM2$n.eff, summary)
-sapply(fit2.KM2$Rhat, summary)
-plot(fit2.KM2)
-traceplot(fit2.KM2, parameters="rho")
-traceplot(fit2.KM2, parameters="sigmay")
-save(fit2.KM2, file = file.path(analysis.path, "fit2.KM2.rda"))
-load(file.path(analysis.path, "fit2.KM2.rda"))
-
-
-#------------------------------------------------------------------------------#
 
 # Fit to whole dataset
 # dev are the deviates in the X and Y  dimensions; 
@@ -457,12 +379,12 @@ load(file.path(analysis.path, "fit2.KM2.rda"))
 # id2 is the index of individuals of the retained observation of judas
 
 # Number of all retained observation of each judas
-N2 <- nrow(judas.cleaned.sub)
+N2 <- nrow(judas.cleaned.HR)
 
-n <- length(judas.cleaned.sub[, unique(JUDAS_ID)])
+n <- length(judas.cleaned.HR[, unique(JUDAS_ID)])
 data <- list(N2=N2, M=n, mean=c(0,0), 
-             id2=judas.cleaned.sub[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
-             dev=as.matrix(judas.cleaned.sub[, .(xdev, ydev)]))
+             id2=judas.cleaned.HR[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
+             dev=as.matrix(judas.cleaned.HR[, .(xdev, ydev)]))
 
 inits <- function(){list(sigmax=runif(n, 0.1, 10), 
                          sigmay=runif(n, 0.1, 10), 
@@ -708,6 +630,10 @@ sapply(t_int, "[[", 3)
 #> 3.64 324.21   0.45  41.64   0.44
 
 #### Integration for PB ####
+analysis.path <- "../Data/Analysis"
+load(file = file.path(analysis.path, "fit1.PB2.rda"))
+load(file.path(analysis.path, "fit2.PB.rda"))
+
 b1<- fit1.PB2$mean$b1
 b2<- fit1.PB2$mean$b2
 sigmax<- fit2.PB$mean$sigmax 
@@ -770,8 +696,9 @@ system.time(
 
 ggplot(pdet.KM, aes(DProb)) + geom_density() 
 ggsave(filename = file.path(analysis.path, "DProb.density.KM.pdf"))
-
-
+quantile(pdet.KM[, 1], probs = c(0.025, 0.975))
+# 2.5%       97.5% 
+#  0.008629166 0.070037964 
 
 # Using fit2.KM2
 analysis.path <- "../Data/Analysis"
