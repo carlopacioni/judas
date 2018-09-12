@@ -16,7 +16,7 @@ hparms<- fit2.KM$mean
 
 cellsize <- 1  # resolution of raster in km
 nsims<- 10
-njudas<- c(10,25,50,100)
+njudas<- c(10,50,100,500)
 results<- matrix(NA,nrow=length(njudas),ncol=9)
 
 rr<- raster(tmpzone, resolution=cellsize)
@@ -63,7 +63,7 @@ names(results)<- c("Seu","Seu.l","Seu.u","Cov","Cov.l","Cov.u","SSe","SSe.l","SS
 # Single realisation for plotting
 #
 
-njudas<- c(10,25,50,100)
+njudas<- c(10,50,100,500)
 cellsize<- 1
 
 rast<- list()
@@ -74,7 +74,7 @@ rr<- raster(tmpzone, resolution=cellsize)
 rr<- rasterize(tmpzone, rr, 0)
 
 for(i in 1:length(njudas)) {
-  cat(paste("doing sample size ",np[i],sep=""),"\n")
+  cat(paste("doing sample size ",njudas[i],sep=""),"\n")
   
   cells<- sampleRandom(rr,size=njudas[i],xy=TRUE) 
   dat<- data.frame(xbar=cells[,1],ybar=cells[,2])
@@ -92,7 +92,7 @@ for(i in 1:length(njudas)) {
   
   params<- data.frame(sigmax=sx,sigmay=sy,rho=rho,b1=b1,b2=b2)
   
-  bvn.surf<- make.surface(dat,params,tmpzone, nperiod=1, cellsize=cellsize, CE=0.95, Pu=1)
+  bvn.surf<- make.surface(dat,params,tmpzone, nperiod=12, cellsize=cellsize, CE=0.99, Pu=1)
   
   rast[[i]]<- bvn.surf$Raster
   Pd[[i]]<- bvn.surf$Table
@@ -109,7 +109,7 @@ for(i in 1:4) {
   plot(rast[[i]],col=pal.1(100))
   plot(tmpzone,add=T)
   points(centers[[i]]$xbar,centers[[i]]$ybar,cex=0.6,pch=16,col="white")
-  mtext(paste("n=",np[i],sep=""),side=3,cex=1)
+  mtext(paste("n=",njudas[i],sep=""),side=3,cex=1)
   box()
 }
 
@@ -180,7 +180,7 @@ make.surface<- function(dat, parms, shape, nperiod, cellsize, CE=0.95, Pu=1, ver
   den <- mask(den, shape)
   
   N<- length(Which(den >= 0, cells=T))
-  n<- length(Which(den > 1e6, cells=T)) # sampled cells
+  n<- length(Which(den > 1e-6, cells=T)) # sampled cells
   den<- calc(den, function(x){1-exp(-x)}) #Probability scale
   seu_avg<- cellStats(den, 'mean', na.rm=TRUE)
   SSe<- 1 - (1 - seu_avg * n/N)^(Pu/N * N)
