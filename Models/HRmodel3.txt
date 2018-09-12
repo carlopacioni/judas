@@ -1,0 +1,32 @@
+
+    model {
+     for(i in 1 : N2) { 
+     dev[i,1:2] ~ dmnorm(mean[1:2], tau[id2[i],1:2,1:2])
+    }
+    
+    for(j in 1:M) {
+     tau[j,1:2,1:2]<- inverse(Sigma[j,,])
+     Sigma[j,1,1]<- pow(sigmax[j],2)
+     log(sigmax[j]) <- log.sigmax[j]
+     log.sigmax[j] ~ dnorm(mu.sigmax, tau.sigmax)
+     Sigma[j,2,2]<- pow(sigmay[j],2)
+     log(sigmay[j]) <- log.sigmay[j]
+     log.sigmay[j] ~ dnorm(mu.sigmay, tau.sigmay)
+     Sigma[j,1,2]<- rho[j]*sigmax[j]*sigmay[j]
+     Sigma[j,2,1]<- Sigma[j,1,2]
+     rho[j]<- 2 * (r[j] - 0.5)
+	 r[j] ~ dbeta(a, b)
+    }
+	a<- mu.rho * tau.rho
+	b<- (1 - mu.rho) * tau.rho
+	tau.rho<- 1/(sig.rho * sig.rho)
+	sig.rho ~ dt(0,1, 4) T(0,)
+	mu.sigmax ~ dnorm(0, 0.1)
+	mu.sigmay ~ dnorm(0, 0.1)
+	mu.rho ~ dbeta(2, 2)
+	tau.sigmax <- 1/(sigx*sigx)
+	tau.sigmay <- 1/(sigy*sigy)
+	sigx ~ dt(0,1, 4) T(0,)
+	sigy ~ dt(0,1, 4) T(0,)
+  }
+    

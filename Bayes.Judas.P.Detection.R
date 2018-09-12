@@ -309,11 +309,11 @@ data <- list(N2=nrow(judas.tmp.PB), M=n, mean=c(0,0),
              id2=judas.tmp.PB[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
             dev=as.matrix(judas.tmp.PB[, .(xdev, ydev)]))
 
-inits <- function(){list(mu.sigmax=0,rho=runif(n,-1,1),
-                         mu.sigmay=0,mu.rho=0,sigx=1,sigy=1,
+inits <- function(){list(mu.sigmax=0,r=rep(0.5,n),
+                         mu.sigmay=0,mu.rho=0.5,sigx=1,sigy=1,
                          sig.rho=1)}
 
-params<- c("mu.sigmax","mu.sigmay","mu.rho","sigx","sigy","sig.rho","rho","sigmax","sigmay")
+params<- c("mu.sigmax","mu.sigmay","a","sigx","sigy","b","rho","sigmax","sigmay")
 
 # fit model to data using WinBUGS code
 ni <- 2000
@@ -321,7 +321,7 @@ nb <- 1000
 nthin <- 1
 nc <- 3
 np <- 8 # Number of CPUs
-fit2.PB = jags(data, inits, params,  model.file="./Models/HRmodel2.txt", 
+fit2.PB = jags(data, inits, params,  model.file="./Models/HRmodel3.txt", 
             n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
             parallel=ifelse(nc>1, TRUE, FALSE), 
             n.cores=ifelse(floor(nc/np) < np, nc, np))
@@ -355,10 +355,10 @@ data <- list(N2=nrow(judas.tmp.KM), M=n, mean=c(0,0),
              dev=as.matrix(judas.tmp.KM[, .(xdev, ydev)]))
 
 inits <- function(){list(mu.sigmax=0,
-                         mu.sigmay=0,mu.rho=0,sigx=1,sigy=1,
+                         mu.sigmay=0,mu.rho=0.5,sigx=1,sigy=1,
                          sig.rho=1)}
 
-params<- c("mu.sigmax","mu.sigmay","mu.rho","sigx","sigy","sig.rho","rho","sigmax","sigmay")
+params<- c("mu.sigmax","mu.sigmay","a","sigx","sigy","b","rho","sigmax","sigmay")
 
 # fit model to data using WinBUGS code
 ni <- 2000
@@ -366,7 +366,7 @@ nb <- 1000
 nthin <- 1
 nc <- 3
 np <- 8 # Number of CPUs
-fit2.KM = jags(data, inits, params,  model.file="./Models/HRmodel2.txt", 
+fit2.KM = jags(data, inits, params,  model.file="./Models/HRmodel3.txt", 
                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
