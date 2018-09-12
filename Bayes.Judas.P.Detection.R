@@ -393,6 +393,39 @@ traceplot(fit2.PB, parameters="sigmay")
 save(fit2.PB, file = file.path(analysis.path, "fit2.PB.rda"))
 load(file.path(analysis.path, "fit2.PB.rda"))
 #------------------------------------------------------------------------------#
+#   Fit model with overarching priors
+inits <- function(){list(mu.sigmax.pop=runif(1, 0, 4),
+                         tau.sigmax.pop=runif(1, 0, 4),
+                         mu.sigmay.pop=runif(1, 0, 4),
+                         tau.sigmay.pop=runif(1, 0, 4), 
+                         mu.rho.pop=runif(1, -1, 1),
+                         sigma.rho.pop=runif(1, 0, 0.5))}
+
+params<- c("mu.sigmax.pop", "tau.sigmax.pop", "mu.sigmay.pop", "tau.sigmay.pop",
+           "mu.rho.pop", "sigma.rho.pop", "rho", "sigmax","sigmay")
+
+# fit model to data using WinBUGS code
+ni <- 3000
+nb <- 1000
+nthin <- 1
+nc <- 3
+np <- 8 # Number of CPUs
+fit2.PB2 <- jags(data, inits, params,  model.file="./Models/HRmodel.vcov.hyperpriors.txt", 
+                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
+                parallel=ifelse(nc>1, TRUE, FALSE), 
+                n.cores=ifelse(floor(nc/np) < np, nc, np))
+
+summary(fit2.PB2)
+print(fit2.PB2, digits=3) 
+sapply(fit2.PB2$n.eff, summary)
+sapply(fit2.PB2$Rhat, summary)
+plot(fit2.PB2)
+traceplot(fit2.PB2, parameters="rho")
+traceplot(fit2.PB2, parameters="sigmay")
+save(fit2.PB2, file = file.path(analysis.path, "fit2.PB.rda"))
+load(file.path(analysis.path, "fit2.PB2.rda"))
+
+#------------------------------------------------------------------------------#
 
 #### Fit to KM data ####
 
@@ -457,7 +490,38 @@ traceplot(fit2.KM, parameters="rho")
 traceplot(fit2.KM, parameters="sigmay")
 save(fit2.KM, file = file.path(analysis.path, "fit2.KM.rda"))
 load(file.path(analysis.path, "fit2.KM.rda"))
+#------------------------------------------------------------------------------#
+#   Fit model with overarching priors
+inits <- function(){list(mu.sigmax.pop=runif(1, 0, 4),
+                         tau.sigmax.pop=runif(1, 0, 4),
+                         mu.sigmay.pop=runif(1, 0, 4),
+                         tau.sigmay.pop=runif(1, 0, 4), 
+                         mu.rho.pop=runif(1, -1, 1),
+                         sigma.rho.pop=runif(1, 0, 0.5))}
 
+params<- c("mu.sigmax.pop", "tau.sigmax.pop", "mu.sigmay.pop", "tau.sigmay.pop",
+           "mu.rho.pop", "sigma.rho.pop", "rho", "sigmax","sigmay")
+
+# fit model to data using WinBUGS code
+ni <- 5000
+nb <- 1000
+nthin <- 1
+nc <- 4
+np <- 8 # Number of CPUs
+fit2.KM2 <- jags(data, inits, params,  model.file="./Models/HRmodel.vcov.hyperpriors.txt", 
+                 n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
+                 parallel=ifelse(nc>1, TRUE, FALSE), 
+                 n.cores=ifelse(floor(nc/np) < np, nc, np))
+
+summary(fit2.KM2)
+print(fit2.KM2, digits=3) 
+sapply(fit2.KM2$n.eff, summary)
+sapply(fit2.KM2$Rhat, summary)
+plot(fit2.KM2)
+traceplot(fit2.KM2, parameters="rho")
+traceplot(fit2.KM2, parameters="sigmay")
+save(fit2.KM2, file = file.path(analysis.path, "fit2.KM2.rda"))
+load(file.path(analysis.path, "fit2.KM2.rda"))
 
 #------------------------------------------------------------------------------#
 
@@ -503,10 +567,43 @@ traceplot(fit2, parameters="sigmay")
 save(fit2, file = file.path(analysis.path, "fit2.rda"))
 load(file.path(analysis.path, "fit2.rda"))
 #------------------------------------------------------------------------------#
+#   Fit model with overarching priors
+inits <- function(){list(mu.sigmax.pop=runif(1, 0, 4),
+                         tau.sigmax.pop=runif(1, 0, 4),
+                         mu.sigmay.pop=runif(1, 0, 4),
+                         tau.sigmay.pop=runif(1, 0, 4), 
+                         mu.rho.pop=runif(1, -1, 1),
+                         sigma.rho.pop=runif(1, 0, 0.5))}
+
+params<- c("mu.sigmax.pop", "tau.sigmax.pop", "mu.sigmay.pop", "tau.sigmay.pop",
+           "mu.rho.pop", "sigma.rho.pop", "rho", "sigmax","sigmay")
+
+# fit model to data using WinBUGS code
+ni <- 6000
+nb <- 1000
+nthin <- 1
+nc <- 4
+np <- 8 # Number of CPUs
+fit2.2 <- jags(data, inits, params,  model.file="./Models/HRmodel.vcov.hyperpriors.txt", 
+                 n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
+                 parallel=ifelse(nc>1, TRUE, FALSE), 
+                 n.cores=ifelse(floor(nc/np) < np, nc, np))
+
+summary(fit2.2)
+print(fit2.2, digits=3) 
+sapply(fit2.2$n.eff, summary)
+sapply(fit2.2$Rhat, summary)
+plot(fit2.2)
+traceplot(fit2.2, parameters="rho")
+traceplot(fit2.2, parameters="sigmay")
+save(fit2.2, file = file.path(analysis.path, "fit2.2.rda"))
+load(file.path(analysis.path, "fit2.2.rda"))
+
+#------------------------------------------------------------------------------#
 
 #### multidimensional integration ####
 
-library(cubature)
+library(cubature) # The package pracma may be faster
 # 2D
 integrand2d1<- function(xy, b1, b2, p) {
   # ellipse
@@ -677,9 +774,40 @@ njudas <- length(b1)
 system.time(
   pdet.PB <- mapp_int(b1, b2, sigmax, sigmay, rho)
 )
+ggplot(pdet.PB, aes(DProb)) + geom_density() 
+ggsave(filename = file.path(analysis.path, "DProb.density.PB.pdf"))
 quantile(pdet.PB[, 1], probs = c(0.025, 0.975))
 # 2.5%       97.5% 
 #  0.007055694 0.070258962 
+
+# Using fit2.PB2
+analysis.path <- "../Data/Analysis"
+load(file = file.path(analysis.path, "fit1.PB2.rda"))
+load(file.path(analysis.path, "fit2.PB2.rda"))
+
+b1<- fit1.PB2$mean$b1
+b2<- fit1.PB2$mean$b2
+sigmax<- fit2.PB2$mean$sigmax 
+sigmay<- fit2.PB2$mean$sigmay
+rho <- fit2.PB2$mean$rho
+
+system.time(
+  pdet.PB2 <- mapp_int(b1, b2, sigmax, sigmay, rho)
+)
+
+ggplot(pdet.PB2, aes(DProb)) + geom_density() 
+ggsave(filename = file.path(analysis.path, "DProb.density.PB2.pdf"))
+quantile(pdet.PB2[, 1], probs = c(0.025, 0.975))
+# 2.5%       97.5% 
+#  0.006474863 0.058781619 
+
+pdet.PB2.mu <- mapp_int(b1=fit1.PB2$mean$mu.b1, b2=fit1.PB2$mean$mu.b2, 
+                 sigmax=fit2.PB2$mean$mu.sigmax.pop, 
+                 sigmay=fit2.PB2$mean$mu.sigmay.pop, 
+                 rho=fit2.PB2$mean$mu.rho.pop) 
+pdet.PB2.mu
+# DProb     Abs_error
+#1 0.02106019 2.065035e-310
 
 #### Integration for KM ####
 analysis.path <- "../Data/Analysis"
@@ -704,6 +832,35 @@ quantile(pdet.KM[, 1], probs = c(0.025, 0.975))
 # 2.5%       97.5% 
 #  0.008629166 0.070037964 
 
+# Using fit2.KM2
+analysis.path <- "../Data/Analysis"
+load(file = file.path(analysis.path, "fit1.KM2.rda"))
+load(file.path(analysis.path, "fit2.KM2.rda"))
+
+b1<- fit1.KM2$mean$b1
+b2<- fit1.KM2$mean$b2
+sigmax<- fit2.KM2$mean$sigmax 
+sigmay<- fit2.KM2$mean$sigmay
+rho <- fit2.KM2$mean$rho
+
+system.time(
+  pdet.KM2 <- mapp_int(b1, b2, sigmax, sigmay, rho)
+)
+
+ggplot(pdet.KM2, aes(DProb)) + geom_density() 
+ggsave(filename = file.path(analysis.path, "DProb.density.KM2.pdf"))
+quantile(pdet.KM2[, 1], probs = c(0.025, 0.975))
+#        2.5%       97.5% 
+# 0.008297998 0.063008072 
+
+pdet.KM2.mu <- mapp_int(b1=fit1.KM2$mean$mu.b1, b2=fit1.KM2$mean$mu.b2, 
+                        sigmax=fit2.KM2$mean$mu.sigmax.pop, 
+                        sigmay=fit2.KM2$mean$mu.sigmay.pop, 
+                        rho=fit2.KM2$mean$mu.rho.pop) 
+pdet.KM2.mu
+#        DProb     Abs_error
+# 0.03877888 2.300748e-310
+
 #### Integration for whole dataset ####
 analysis.path <- "../Data/Analysis"
 load(file = file.path(analysis.path, "fit1.rda"))
@@ -727,3 +884,32 @@ ggsave(filename = file.path(analysis.path, "DProb.density.CA.pdf"))
 quantile(pdet[, 1], probs = c(0.025, 0.975))
 #   2.5%       97.5% 
 #  0.008305563 0.069610217 
+
+# Using fit2.2
+analysis.path <- "../Data/Analysis"
+load(file = file.path(analysis.path, "fit1.rda"))
+load(file.path(analysis.path, "fit2.2.rda"))
+
+b1<- fit1$mean$b1
+b2<- fit1$mean$b2
+sigmax<- fit2.2$mean$sigmax 
+sigmay<- fit2.2$mean$sigmay
+rho <- fit2.2$mean$rho
+
+system.time(
+  pdet.2 <- mapp_int(b1, b2, sigmax, sigmay, rho)
+)
+
+ggplot(pdet.2, aes(DProb)) + geom_density() 
+ggsave(filename = file.path(analysis.path, "DProb.density.2.pdf"))
+quantile(pdet.2[, 1], probs = c(0.025, 0.975))
+# 2.5%       97.5% 
+#  0.008043299 0.061871118  
+
+pdet.2.mu <- mapp_int(b1=fit1$mean$mu.b1, b2=fit1$mean$mu.b2, 
+                        sigmax=fit2.2$mean$mu.sigmax.pop, 
+                        sigmay=fit2.2$mean$mu.sigmay.pop, 
+                        rho=fit2.2$mean$mu.rho.pop) 
+pdet.2.mu
+# DProb     Abs_error
+# 0.03653901 2.563781e-310
