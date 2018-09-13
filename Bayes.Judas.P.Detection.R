@@ -413,218 +413,16 @@ sapply(fit2$Rhat, summary)
 plot(fit2)
 traceplot(fit2, parameters="rho")
 traceplot(fit2, parameters="sigmay")
-save(fit2, file = file.path(analysis.path, "fit2.KM.rda"))
+save(fit2, file = file.path(analysis.path, "fit2.rda"))
 load(file.path(analysis.path, "fit2.rda"))
-#------------------------------------------------------------------------------#
-#   Fit model with overarching priors
-inits <- function(){list(mu.sigmax.pop=runif(1, 0, 4),
-                         tau.sigmax.pop=runif(1, 0, 4),
-                         mu.sigmay.pop=runif(1, 0, 4),
-                         tau.sigmay.pop=runif(1, 0, 4), 
-                         mu.rho.pop=runif(1, -1, 1),
-                         sigma.rho.pop=runif(1, 0, 0.5))}
-
-params<- c("mu.sigmax.pop", "tau.sigmax.pop", "mu.sigmay.pop", "tau.sigmay.pop",
-           "mu.rho.pop", "sigma.rho.pop", "rho", "sigmax","sigmay")
-
-# fit model to data using WinBUGS code
-ni <- 6000
-nb <- 1000
-nthin <- 1
-nc <- 4
-np <- 8 # Number of CPUs
-fit2.2 <- jags(data, inits, params,  model.file="./Models/HRmodel.vcov.hyperpriors.txt", 
-                 n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
-                 parallel=ifelse(nc>1, TRUE, FALSE), 
-                 n.cores=ifelse(floor(nc/np) < np, nc, np))
-
-summary(fit2.2)
-print(fit2.2, digits=3) 
-sapply(fit2.2$n.eff, summary)
-sapply(fit2.2$Rhat, summary)
-plot(fit2.2)
-traceplot(fit2.2, parameters="rho")
-traceplot(fit2.2, parameters="sigmay")
-save(fit2.2, file = file.path(analysis.path, "fit2.2.rda"))
-load(file.path(analysis.path, "fit2.2.rda"))
-
 #------------------------------------------------------------------------------#
 
 #### multidimensional integration ####
-
-
-library(cubature) # The package pracma may be faster
-
-# R2Cuba package for multidimensional integration
-library(R2Cuba)
-
-# 2D
-integrand2d1<- function(xy, b1, b2, p) {
-  # ellipse
-  require(mvtnorm)
-  d2<- (xy[1]^2 + xy[2]^2)
-  d1<- sqrt(d2)
-  covar<- prod(p)
-  covmat<- matrix(c(p[1]^2,covar,covar,p[2]^2),2,2)  
-  e<- dmvnorm(xy,c(0,0),covmat) 
-  int<- e * (1-exp(-exp(b1 + b2*d1)))
-  return(int)
-}
-
-integrand2d2<- function(xy, b1, b2, p, centre, Window) {
-  
-  testx<- centre[1]+xy[1]
-  testy<- centre[2]+xy[2]
-  if(inside.owin(testx,testy,Window)) {
-    d2<- (xy[1]^2 + xy[2]^2)
-    d1<- sqrt(d2)
-    xdev<- xy[1]/p[1]
-    ydev<- xy[2]/p[2]
-    covar<-  2 * p[3] * xdev * ydev
-    e<- (1/(2*pi*p[1]*p[2]*sqrt((1-p[3]^2))))*exp(-(xdev^2 + ydev^2 - covar)/(2*(1-p[3]^2)))
-    int<- e * (1-exp(-exp(b1 + b2*d1)))
-  }
-  else int<- 0
-  return(int)
-}
-
-integrand2d3<- function(xy, b1, b2, p) {
-  
-  d2<- (xy[1]^2 + xy[2]^2)
-  d1<- sqrt(d2)
-  xdev<- xy[1]/p[1]
-  ydev<- xy[2]/p[2]
-  covar<-  2 * p[3] * xdev * ydev
-  e<- (1/(2*pi*p[1]*p[2]*sqrt((1-p[3]^2))))*exp(-(xdev^2 + ydev^2 - covar)/(2*(1-p[3]^2)))
-  int<- e * (1-exp(-exp(b1 + b2*d1)))
-  
-  return(int)
-}
-
-integrand2d3_bis<- function(xy, b1, b2, sigmax, sigmay, rho) {
-  
-  d2<- (xy[1]^2 + xy[2]^2)
-  d1<- sqrt(d2)
-  xdev<- xy[1]/sigmax
-  ydev<- xy[2]/sigmay
-  covar<-  2 * rho * xdev * ydev
-  e<- (1/(2*pi*sigmax*sigmay*sqrt((1-rho^2))))*exp(-(xdev^2 + ydev^2 - covar)/(2*(1-rho^2)))
-  int<- e * (1-exp(-exp(b1 + b2*d1)))
-  return(int)
-}
-
-# wrap integrand2d3_bis with mapply
-mapp_int <- function(b1, b2, sigmax, sigmay, rho,f=integrand2d3_bis, 
-                     lowerLimit=c(-50,-50), upperLimit=c(50,50), tol = 1e-05, 
-                     fDim = 2, maxEval = 5e05, absError = 1e-10, vectorInterface=FALSE,
-                     SIMPLIFY=FALSE) {
-  mapp_list <- mapply(FUN = hcubature, b1=b1, b2=b2, sigmax=sigmax, sigmay=sigmay, rho=rho, 
-                      MoreArgs=list(f=f,lowerLimit=lowerLimit, upperLimit=upperLimit, 
-                                    tol=tol, fDim=fDim, maxEval=maxEval, 
-                                    absError=absError, vectorInterface=vectorInterface), 
-                      SIMPLIFY=SIMPLIFY)
-  
-  p.det<- data.frame(DProb=t(sapply(mapp_list, "[[", 1))[, 1],
-                     Abs_error=t(sapply(mapp_list, "[[", 1))[, 2])
-  return(p.det)
-}
-
-# Tried a vectorised fun passing a matrix, which is supposed to be way faster, but it doesn't work
-integrand2d3_v<- function(xy, b1, b2, sigmax, sigmay, rho) {
-  
-  d2<- (xy[, 1]^2 + xy[, 2]^2)
-  d1<- sqrt(d2)
-  xdev<- xy[, 1]/sigmax
-  ydev<- xy[, 2]/sigmay
-  covar<-  2 * rho * xdev * ydev
-  e<- (1/(2*pi*sigmax*sigmay*sqrt((1-rho^2))))*exp(-(xdev^2 + ydev^2 - covar)/(2*(1-rho^2)))
-  int<- e * (1-exp(-exp(b1 + b2*d1)))
-  return(int)
-}
-
-vec_int <- function(b1, b2, sigmax=sigmax, sigmay=sigmay, rho=rho, limit=50, 
-                    tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10) {
-  njudas <- length(b1)
-  int <- hcubature(f=integrand2d3_v, lowerLimit=matrix(-limit, njudas, 2), 
-                   upperLimit=matrix(limit, njudas, 2), 
-                   b1=b1, b2=b2, sigmax=sigmax, sigmay=sigmay, rho=rho,
-                   tol=tol, fDim=fDim, maxEval=maxEval, absError=absError, 
-                   vectorInterface = TRUE)
-  
-  p.det<- data.frame(DProb=int$integral,
-                     Abs_error=int$error)
-  return(p.det)
-}
+source("./MultiDimIntegration.funcitons.R")
 
 #------------------------------------------------------------------------------#
 #### speed test ####
-b1<- fit1.PB2$mean$b1
-b2<- fit1.PB2$mean$b2
-sigmax<- fit2.PB$mean$sigmax 
-sigmay<- fit2.PB$mean$sigmay
-rho <- fit2.PB$mean$rho
-p.det <- matrix(NA, njudas, 2)
-
-# limit njudas to test speed
-njudas<-5
-t_int <- vector("list", length = 6)
-t_int[[1]] <- system.time(
-  for(i in 1:njudas) {
-    message(paste("doing judas No. ", i, sep=""))
-  int <- hcubature(f=integrand2d1, lowerLimit=c(-50,-50), upperLimit=c(50,50), 
-                   b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
-                   tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
-  p.det[i, 1] <- int$integral[1]
-  p.det[i, 2] <- int$error[1]
-  } 
-)
-
-t_int[[2]] <- system.time(
-  for(i in 1:njudas) {
-    message(paste("doing judas No. ", i, sep=""))
-    int <- pcubature(f=integrand2d1, lowerLimit=c(-50,-50), upperLimit=c(50,50), 
-                     b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
-                     tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
-    p.det[i, 1] <- int$integral[1]
-    p.det[i, 2] <- int$error[1]
-  } 
-)
-
-t_int[[3]] <- system.time(
-  for(i in 1:njudas) {
-    message(paste("doing judas No. ", i, sep=""))
-    int <- hcubature(f=integrand2d3, lowerLimit=c(-50,-50), upperLimit=c(50,50), 
-                     b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
-                     tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
-    p.det[i, 1] <- int$integral[1]
-    p.det[i, 2] <- int$error[1]
-  } 
-)
-
-t_int[[4]] <- system.time(
-  for(i in 1:njudas) {
-    message(paste("doing judas No. ", i, sep=""))
-    int <- pcubature(f=integrand2d3, lowerLimit=c(-50,-50), upperLimit=c(50,50), 
-                     b1=b1[i], b2=b2[i], p=c(sigmax[i], sigmay[i], rho[i]),
-                     tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
-    p.det[i, 1] <- int$integral[1]
-    p.det[i, 2] <- int$error[1]
-  } 
-)
-
-t_int[[5]] <- system.time(
-  pdet <- mapp_int(b1[1:njudas], b2[1:njudas], sigmax[1:njudas], 
-                   sigmay[1:njudas], rho[1:njudas])
-)
-
-# This doesn't work :-(
-t_int[[6]] <- system.time(
-  p.det <- vec_int(b1=b1[1:njudas], b2=b2[1:njudas], sigmax=sigmax[1:njudas], 
-                   sigmay=sigmay[1:njudas], rho=rho[1:njudas],
-                   tol = 1e-05, fDim = 2, maxEval = 5e05, absError = 1e-10)
-)
-
-sapply(t_int, "[[", 3)
+source("./MultiDimInteg_speedTest.R")
 #> 3.64 324.21   0.45  41.64   0.44
 
 #### Integration for PB ####
@@ -632,56 +430,52 @@ analysis.path <- "../Data/Analysis"
 load(file = file.path(analysis.path, "fit1.PB2.rda"))
 load(file.path(analysis.path, "fit2.PB.rda"))
 
+# Individual Judas
 b1<- fit1.PB2$mean$b1
 b2<- fit1.PB2$mean$b2
 sigmax<- fit2.PB$mean$sigmax 
 sigmay<- fit2.PB$mean$sigmay
 rho <- fit2.PB$mean$rho
 
-
 system.time(
   pdet.PB <- mapp_int(b1, b2, sigmax, sigmay, rho)
 )
 ggplot(pdet.PB, aes(DProb)) + geom_density() 
 ggsave(filename = file.path(analysis.path, "DProb.density.PB.pdf"))
-quantile(pdet.PB[, 1], probs = c(0.025, 0.975))
-# 2.5%       97.5% 
-#  0.007055694 0.070258962 
+quantile(pdet.PB[, 1], probs = c(0.025, 0.5, 0.975))
+#       2.5%         50%       97.5% 
+# 0.006285564 0.019556476 0.058474979 
 
-# Using fit2.PB2
-analysis.path <- "../Data/Analysis"
-load(file = file.path(analysis.path, "fit1.PB2.rda"))
-load(file.path(analysis.path, "fit2.PB2.rda"))
-
-b1<- fit1.PB2$mean$b1
-b2<- fit1.PB2$mean$b2
-sigmax<- fit2.PB2$mean$sigmax 
-sigmay<- fit2.PB2$mean$sigmay
-rho <- fit2.PB2$mean$rho
-
-system.time(
-  pdet.PB2 <- mapp_int(b1, b2, sigmax, sigmay, rho)
-)
-
-ggplot(pdet.PB2, aes(DProb)) + geom_density() 
-ggsave(filename = file.path(analysis.path, "DProb.density.PB2.pdf"))
-quantile(pdet.PB2[, 1], probs = c(0.025, 0.975))
-# 2.5%       97.5% 
-#  0.006474863 0.058781619 
-
+# Mean h
 pdet.PB2.mu <- mapp_int(b1=fit1.PB2$mean$mu.b1, b2=fit1.PB2$mean$mu.b2, 
-                 sigmax=fit2.PB2$mean$mu.sigmax.pop, 
-                 sigmay=fit2.PB2$mean$mu.sigmay.pop, 
-                 rho=fit2.PB2$mean$mu.rho.pop) 
+                 sigmax=exp(qnorm(0.5, fit2.PB$mean$mu.sigmax, fit2.PB$mean$sigx)),
+                 sigmay=exp(qnorm(0.5, fit2.PB$mean$mu.sigmay, fit2.PB$mean$sigy)), 
+                 rho=2 * (qbeta(0.5, fit2.PB$mean$a, fit2.PB$mean$b) - 0.5)) 
 pdet.PB2.mu
 # DProb     Abs_error
-#1 0.02106019 2.065035e-310
+#1 0.02109411 1.048961e-310
 
+# Compute variablility around mean unconditional prob of detection
+LL.fit1 <- length(fit1.PB2$sims.list$mu.b1) # the MCMC was run for longer in fit1 than it is in fit2
+
+ss <- sample(1:LL.fit1, size = length(fit2.PB$sims.list$mu.sigmax), replace = FALSE)
+system.time(
+pdet.PB2.mu.mcmc <- mapp_int(b1=fit1.PB2$sims.list$mu.b1[ss], 
+                        b2=fit1.PB2$sims.list$mu.b2[ss], 
+                 sigmax=exp(qnorm(0.5, fit2.PB$sims.list$mu.sigmax, fit2.PB$sims.list$sigx)),
+                 sigmay=exp(qnorm(0.5, fit2.PB$sims.list$mu.sigmay, fit2.PB$sims.list$sigy)), 
+                 rho=2 * (qbeta(0.5, fit2.PB$sims.list$a, fit2.PB$sims.list$b) - 0.5)) 
+)
+quantile(pdet.PB2.mu.mcmc[, 1], probs = c(0.025, 0.5, 0.975))
+#      2.5%        50%      97.5% 
+# 0.01095804 0.02171224 0.03542346 
+      
 #### Integration for KM ####
 analysis.path <- "../Data/Analysis"
 load(file = file.path(analysis.path, "fit1.KM2.rda"))
 load(file.path(analysis.path, "fit2.KM.rda"))
 
+# Individual Judas
 b1<- fit1.KM2$mean$b1
 b2<- fit1.KM2$mean$b2
 sigmax<- fit2.KM$mean$sigmax 
@@ -692,78 +486,76 @@ system.time(
   pdet.KM <- mapp_int(b1, b2, sigmax, sigmay, rho)
 )
 
-ggplot(pdet.KM, aes(DProb)) + geom_density() 
+ggplot(pdet.KM, aes(DProb)) + geom_density() +xlim(c(0, 0.1))
 ggsave(filename = file.path(analysis.path, "DProb.density.KM.pdf"))
 quantile(pdet.KM[, 1], probs = c(0.025, 0.975))
 # 2.5%       97.5% 
-#  0.008629166 0.070037964 
+# 0.008268773 0.062367318 
 
-# Using fit2.KM2
-analysis.path <- "../Data/Analysis"
-load(file = file.path(analysis.path, "fit1.KM2.rda"))
-load(file.path(analysis.path, "fit2.KM2.rda"))
+# Mean h
+pdet.KM.mu <- mapp_int(b1=fit1.KM2$mean$mu.b1, b2=fit1.KM2$mean$mu.b2, 
+                 sigmax=exp(qnorm(0.5, fit2.KM$mean$mu.sigmax, fit2.KM$mean$sigx)),
+                 sigmay=exp(qnorm(0.5, fit2.KM$mean$mu.sigmay, fit2.KM$mean$sigy)), 
+                 rho=2 * (qbeta(0.5, fit2.KM$mean$a, fit2.KM$mean$b) - 0.5)) 
+pdet.KM.mu
+# DProb     Abs_error
+#1 0.0366868 1.270618e-310
 
-b1<- fit1.KM2$mean$b1
-b2<- fit1.KM2$mean$b2
-sigmax<- fit2.KM2$mean$sigmax 
-sigmay<- fit2.KM2$mean$sigmay
-rho <- fit2.KM2$mean$rho
+# Compute variablility around mean unconditional prob of detection
+LL.fit1 <- length(fit1.KM2$sims.list$mu.b1) # the MCMC was run for longer in fit1 than it is in fit2
 
+ss <- sample(1:LL.fit1, size = length(fit2.KM$sims.list$mu.sigmax), replace = FALSE)
 system.time(
-  pdet.KM2 <- mapp_int(b1, b2, sigmax, sigmay, rho)
+pdet.KM.mu.mcmc <- mapp_int(b1=fit1.KM2$sims.list$mu.b1[ss], 
+                        b2=fit1.KM2$sims.list$mu.b2[ss], 
+                 sigmax=exp(qnorm(0.5, fit2.KM$sims.list$mu.sigmax, fit2.KM$sims.list$sigx)),
+                 sigmay=exp(qnorm(0.5, fit2.KM$sims.list$mu.sigmay, fit2.KM$sims.list$sigy)), 
+                 rho=2 * (qbeta(0.5, fit2.KM$sims.list$a, fit2.KM$sims.list$b) - 0.5)) 
 )
-
-ggplot(pdet.KM2, aes(DProb)) + geom_density() 
-ggsave(filename = file.path(analysis.path, "DProb.density.KM2.pdf"))
-quantile(pdet.KM2[, 1], probs = c(0.025, 0.975))
-#        2.5%       97.5% 
-# 0.008297998 0.063008072 
-
-pdet.KM2.mu <- mapp_int(b1=fit1.KM2$mean$mu.b1, b2=fit1.KM2$mean$mu.b2, 
-                        sigmax=fit2.KM2$mean$mu.sigmax.pop, 
-                        sigmay=fit2.KM2$mean$mu.sigmay.pop, 
-                        rho=fit2.KM2$mean$mu.rho.pop) 
-pdet.KM2.mu
-#        DProb     Abs_error
-# 0.03877888 2.300748e-310
+quantile(pdet.KM.mu.mcmc[, 1], probs = c(0.025, 0.5, 0.975))
+#      2.5%        50%      97.5% 
+# 0.03128371 0.03681183 0.04241456  
 
 #### Integration for whole dataset ####
 analysis.path <- "../Data/Analysis"
 load(file = file.path(analysis.path, "fit1.rda"))
 load(file.path(analysis.path, "fit2.rda"))
 
-
-#============================================================================
-
-quantile(pdet[, 1], probs = c(0.025, 0.975))
-#   2.5%       97.5% 
-#  0.008305563 0.069610217 
-
-# Using fit2.2
-analysis.path <- "../Data/Analysis"
-load(file = file.path(analysis.path, "fit1.rda"))
-load(file.path(analysis.path, "fit2.2.rda"))
-
 b1<- fit1$mean$b1
 b2<- fit1$mean$b2
-sigmax<- fit2.2$mean$sigmax 
-sigmay<- fit2.2$mean$sigmay
-rho <- fit2.2$mean$rho
+sigmax<- fit2$mean$sigmax 
+sigmay<- fit2$mean$sigmay
+rho <- fit2$mean$rho
 
 system.time(
-  pdet.2 <- mapp_int(b1, b2, sigmax, sigmay, rho)
+  pdet.CA <- mapp_int(b1, b2, sigmax, sigmay, rho)
 )
 
-ggplot(pdet.2, aes(DProb)) + geom_density() 
-ggsave(filename = file.path(analysis.path, "DProb.density.2.pdf"))
-quantile(pdet.2[, 1], probs = c(0.025, 0.975))
-# 2.5%       97.5% 
-#  0.008043299 0.061871118  
+ggplot(pdet.CA, aes(DProb)) + geom_density() 
+ggsave(filename = file.path(analysis.path, "DProb.density.CA.pdf"))
+quantile(pdet.CA[, 1], probs = c(0.025, 0.5, 0.975))
+#  2.5%         97.5% 
+#  0.007890469 0.034008355 0.061669921  
 
-pdet.2.mu <- mapp_int(b1=fit1$mean$mu.b1, b2=fit1$mean$mu.b2, 
-                        sigmax=fit2.2$mean$mu.sigmax.pop, 
-                        sigmay=fit2.2$mean$mu.sigmay.pop, 
-                        rho=fit2.2$mean$mu.rho.pop) 
-pdet.2.mu
+pdet.CA.mu <- mapp_int(b1=fit1$mean$mu.b1, b2=fit1$mean$mu.b2, 
+                         sigmax=exp(qnorm(0.5, fit2$mean$mu.sigmax, fit2$mean$sigx)),
+                 sigmay=exp(qnorm(0.5, fit2$mean$mu.sigmay, fit2$mean$sigy)), 
+                 rho=2 * (qbeta(0.5, fit2$mean$a, fit2$mean$b) - 0.5))
+pdet.CA.mu
 # DProb     Abs_error
-# 0.03653901 2.563781e-310
+# 0.03478861 1.863031e-310
+
+# Compute variablility around mean unconditional prob of detection
+LL.fit1 <- length(fit1$sims.list$mu.b1) # the MCMC was run for longer in fit1 than it is in fit2
+
+ss <- sample(1:LL.fit1, size = length(fit2$sims.list$mu.sigmax), replace = FALSE)
+system.time(
+pdet.CA.mu.mcmc <- mapp_int(b1=fit1$sims.list$mu.b1[ss], 
+                        b2=fit1$sims.list$mu.b2[ss], 
+                 sigmax=exp(qnorm(0.5, fit2$sims.list$mu.sigmax, fit2$sims.list$sigx)),
+                 sigmay=exp(qnorm(0.5, fit2$sims.list$mu.sigmay, fit2$sims.list$sigy)), 
+                 rho=2 * (qbeta(0.5, fit2$sims.list$a, fit2$sims.list$b) - 0.5)) 
+)
+quantile(pdet.CA.mu.mcmc[, 1], probs = c(0.025, 0.5, 0.975))
+#      2.5%        50%      97.5% 
+# 0.02975004 0.03483036 0.04010203 
