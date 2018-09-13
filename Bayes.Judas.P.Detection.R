@@ -280,7 +280,8 @@ mu.b2.backtrans <- 1-exp(-exp(fit1$mean$mu.b2))
 data.path <- "../Data/"
 load(file = file.path(data.path, "judas.cleaned.HR.rda"))
 
-# Fit to PB data
+#### Fit to PB data ####
+judas.cleaned.HR.PB <- judas.cleaned.HR[Region == "PILBARA",]
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
@@ -321,11 +322,12 @@ sapply(fit2.PB$Rhat, summary)
 plot(fit2.PB)
 traceplot(fit2.PB, parameters="rho")
 traceplot(fit2.PB, parameters="sigmay")
+analysis.path <- "../Data/Analysis"
 save(fit2.PB, file = file.path(analysis.path, "fit2.PB.rda"))
 load(file.path(analysis.path, "fit2.PB.rda"))
 #------------------------------------------------------------------------------#
 
-# Fit to KM data
+#### Fit to KM data ####
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
@@ -353,7 +355,7 @@ params<- c("mu.sigmax","mu.sigmay","a","sigx","sigy","b","rho","sigmax","sigmay"
 ni <- 2000
 nb <- 1000
 nthin <- 1
-nc <- 3
+nc <- 4
 np <- 8 # Number of CPUs
 fit2.KM = jags(data, inits, params,  model.file="./Models/HRmodel3.txt", 
                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin,  
@@ -367,12 +369,13 @@ sapply(fit2.KM$Rhat, summary)
 plot(fit2.KM)
 traceplot(fit2.KM, parameters="rho")
 traceplot(fit2.KM, parameters="sigmay")
+analysis.path <- "../Data/Analysis"
 save(fit2.KM, file = file.path(analysis.path, "fit2.KM.rda"))
 load(file.path(analysis.path, "fit2.KM.rda"))
 
 #------------------------------------------------------------------------------#
 
-# Fit to whole dataset
+#### Fit to whole dataset ####
 # dev are the deviates in the X and Y  dimensions; 
 # N2 is the total number of observations (locations) for each judas; 
 # M is the number of individuals; mean[] is given as data c(0,0)
@@ -386,24 +389,19 @@ data <- list(N2=N2, M=n, mean=c(0,0),
              id2=judas.cleaned.HR[, as.numeric(unclass(as.factor(JUDAS_ID)))], 
              dev=as.matrix(judas.cleaned.HR[, .(xdev, ydev)]))
 
-inits <- function(){list(sigmax=runif(n, 0.1, 10), 
-                         sigmay=runif(n, 0.1, 10), 
-                         rho=runif(n, -1, 1))}
+inits <- function(){list(mu.sigmax=0,
+                         mu.sigmay=0,mu.rho=0.5,sigx=1,sigy=1,
+                         sig.rho=1)}
 
-params<- c("sigmax","sigmay","rho")
+params<- c("mu.sigmax","mu.sigmay","a","sigx","sigy","b","rho","sigmax","sigmay")
 
 # fit model to data using WinBUGS code
-ni <- 20000
+ni <- 3000
 nb <- 1000
 nthin <- 1
-nc <- 1
+nc <- 4
 np <- 8 # Number of CPUs
-fit2 = jags(data, inits, params,  model.file="./Models/HRmodel.txt", 
-               n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
-               parallel=ifelse(nc>1, TRUE, FALSE), 
-               n.cores=ifelse(floor(nc/np) < np, nc, np))
-
-fit2 = jags(data, inits, params,  model.file="./Models/HRmodel.vcov.txt", 
+fit2 = jags(data, inits, params,  model.file="./Models/HRmodel3.txt", 
                n.chains=nc, n.iter=ni, n.burnin=nb, n.thin=nthin, #n.adapt = 2000, 
                parallel=ifelse(nc>1, TRUE, FALSE), 
                n.cores=ifelse(floor(nc/np) < np, nc, np))
