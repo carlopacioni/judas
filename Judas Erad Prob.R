@@ -22,7 +22,7 @@ results<- matrix(NA,nrow=length(njudas),ncol=9)
 rr<- raster(tmpzone, resolution=cellsize)
 rr<- rasterize(tmpzone, rr, 0)
 plot(rr)
-
+start_time <- Sys.time()
 for(i in 1:length(njudas)) {
   tmpsims<- matrix(NA,nsims,3)
   cat(paste("doing sample size ",njudas[i],sep=""),"\n")
@@ -49,14 +49,18 @@ for(i in 1:length(njudas)) {
     
     tmpsims[j,]<- unlist(bvn.surf$Table)
   }
-  results[i,1:3]<- c(mean(tmpsims[,1]),quantile(tmpsims[,1],c(0.25,0.975)))
-  results[i,4:6]<- c(mean(tmpsims[,2]),quantile(tmpsims[,2],c(0.25,0.975)))
-  results[i,7:9]<- c(mean(tmpsims[,3]),quantile(tmpsims[,3],c(0.25,0.975)))
+  results[i,1:3]<- c(mean(tmpsims[,1]),quantile(tmpsims[,1],c(0.025,0.975)))
+  results[i,4:6]<- c(mean(tmpsims[,2]),quantile(tmpsims[,2],c(0.025,0.975)))
+  results[i,7:9]<- c(mean(tmpsims[,3]),quantile(tmpsims[,3],c(0.025,0.975)))
   pb$terminate()
 }
+end_time <- Sys.time()
+end_time - start_time
+
 results<- data.frame(results)
 names(results)<- c("Seu","Seu.l","Seu.u","Cov","Cov.l","Cov.u","SSe","SSe.l","SSe.u")
-
+analysis.path <- "../Data/Analysis"
+write.csv(results, file.path(analysis.path, "ProbDetResults.csv"), row.names = F)
 
 #------------------------------------------
 #
