@@ -21,7 +21,7 @@ hparms<- fit2.KM$mean
 
 # Sim params
 cellsizes <- c(1, 5, 10)  # resolution of raster in km
-nsims<- 8
+nsims<- 1000
 njudas<- c(10,50,100,500)
 CE=0.9
 Pus=c(1, 5, 10)
