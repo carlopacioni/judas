@@ -93,3 +93,4 @@ ggplot(results, aes(x=NJudas)) + geom_point(aes(y=SSe), col="black") +
   geom_errorbar(aes(ymin=Cov_lower, ymax=Cov_upper), col="red") +
   facet_grid(CellSize~Pu)
 ggsave(file.path(analysis.path, "SimResPlots.tiff"), dpi = "print")
+ggsave(file.path(analysis.path, "SimResPlots.pdf"), dpi = "print")
