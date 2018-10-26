@@ -140,6 +140,9 @@ runs <- merge(runs, opp.shoot.days, all=TRUE, on=c("Date", "Year", "Month", "Reg
 runs <- runs[Year < 2018,]
 survey.freq <- runs[, .N, by=c("Year", "Month", "Region")]
 survey.freq[, visit := 1]
+save(survey.freq, file =  file.path(data.path, "survey.freq.rda"))
+write.csv(survey.freq, file = file.path(data.path, "survey.freq.csv"))
+
 ggplot(survey.freq, aes(Month, visit)) + geom_histogram(stat = "identity") +
   theme_classic() + ylab("Visited") +
   facet_grid(Year~Region) + scale_x_continuous(breaks = 1:12) +
