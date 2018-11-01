@@ -48,7 +48,7 @@ getvol<- function(X,volume=0.95){
 # nperiod number of discrete time unit the judas are deployed for
 # cellsize the size of the cell (resolution of raster) in km
 # CE=0.95 proportion of the Judas home range coverage
-# Pu minimum number of (occupied) cells that are considered a detection 
+# Pu minimum number of expected occupied cells 
 make.surface<- function(dat, parms, shape, nperiod, cellsize, CE=0.95, Pu=1, verbose=F) {
   n<- nrow(dat)
   rast<- raster(shape, resolution=cellsize)
