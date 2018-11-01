@@ -44,17 +44,12 @@ judas.Dist.Bal.PB[event == 1, summary(Dist)]
 judas.Dist.Bal.PB[event == 0, summary(Dist)]  
 hist(judas.Dist.Bal.PB[, time])
 
-# Number of all retained observation of each judas
-N2.PB <- nrow(judas.cleaned.PB)
-JUDAS_ID.PB <-  
-judas_id_cleaned.PB <- judas.cleaned.PB[, unique(JUDAS_ID)]
-
 # y is the matrix of times and events taking d=1 for an event and d=0 for censoring;
 # N1 is the number of observations (pairs); 
 # M is the number of individuals
 # time is in (integer) months
 
-N1 <- npairs.PB
+N1 <- nrow(judas.Dist.Bal.PB)
 M <- length(judas.Dist.Bal.PB[, unique(ID.1)])
 id1 <- judas.Dist.Bal.PB[, as.numeric(unclass(as.factor(ID.1)))]
 time <- judas.Dist.Bal.PB[, floor(time / (30.4 * 2)) + 1]
