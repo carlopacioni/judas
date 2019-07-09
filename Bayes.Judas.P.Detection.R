@@ -264,8 +264,10 @@ hDist <- mapply(compute.hDist, b1=fit1$mean$b1, b2=fit1$mean$b2,
                 Dist=seq(0, 50, length.out=length(fit1$mean$b1)))
 
 pProf <- data.frame(h=hDist, Distance=seq(0, 50, length.out=length(fit1$mean$b1)))
-ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth()
+ggplot(pProf, aes(Distance, h)) + geom_point() + geom_smooth() + theme_classic() +
+  ylab("Detection probability")
 ggsave(file.path(analysis.path, "Density.dist.Dprob_Dist.CA.pdf"))
+ggsave(file.path(analysis.path, "Density.dist.Dprob_Dist.CA.jpeg"))
 
 mu.b1.backtrans <- 1-exp(-exp(fit1$mean$mu.b1))
 mu.b2.backtrans <- 1-exp(-exp(fit1$mean$mu.b2))

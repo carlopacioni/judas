@@ -8,6 +8,9 @@ dir.create(file.path(data.path, "Analysis"))
 analysis.path <- "../Data/Analysis"
 load(file.path(data.path, "runs.rda"))
 
+# load models' results 
+load(file.path(analysis.path, "FittedMods.rda"))
+
 # log removal rate from data
 runs_years_long[, .(minlog=log(min(N_Donkeys/Effort)), 
                     meanlog=log(mean(N_Donkeys/Effort)),
@@ -512,8 +515,21 @@ ggplot(KM.Ns, aes(Year, log(Mean, 10), col=Analysis, shape=Analysis)) +
 
 ggsave(filename=file.path(analysis.path, "Popsize.est_comp_KM.pdf"))
 
+#### Plot for report ####
+popsize <- data.frame(Region=c(rep("KM", 24), rep("PB", 20)),
+                      Year=c(1994:2017, 1998:2017),
+                      N=c(fit.both.2a$mean$N[, 1], fit.both.2a$mean$N[1:20, 2]),
+                      Lower=c(fit.both.2a$q2.5$N[, 1], fit.both.2a$q2.5$N[1:20, 2]),
+                      Upper=c(fit.both.2a$q97.5$N[, 1], fit.both.2a$q97.5$N[1:20, 2]))
 
+ggplot(popsize, aes(Year, log(N, 10), col=Region, shape=Region)) + 
+  geom_point(alpha=0.5) + 
+  geom_errorbar(aes(ymin=log(Lower, 10), ymax=log(Upper, 10)), alpha=0.5) +
+  theme_classic() +
+  ylab("Population size")
 
+ggsave(filename=file.path(analysis.path, "Popsize.CA.sep_report.pdf"))
+ggsave(filename=file.path(analysis.path, "Popsize.CA.sep_report.jpeg"))
 
 
 
